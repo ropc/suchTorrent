@@ -8,14 +8,14 @@ import GivenTools.*;
 
 class SuchTorrent {
 
-	public static TorrentInfo getTorrentInfo(String filename) {
-		try {
-			TorrentInfo torrentFileInfo = new TorrentInfo(Files.readAllBytes(Paths.get(filename)));
-			return torrentFileInfo;
-		} catch (Exception e) {
-			return null;
-		}
-	}
+	// public static TorrentInfo getTorrentInfo(String filename) {
+	// 	try {
+	// 		TorrentInfo torrentFileInfo = new TorrentInfo(Files.readAllBytes(Paths.get(filename)));
+	// 		return torrentFileInfo;
+	// 	} catch (Exception e) {
+	// 		return null;
+	// 	}
+	// }
 
 	// public static bytes[] httpGET(String url) {
 	// 	try {
@@ -64,26 +64,31 @@ class SuchTorrent {
 		return newSocket;
 	}
 
+	public static URL getTrackerRequestURL(Torrent tor) {
+		String escaped_info_hash = tor.escaped_info_hash;
+		String peer_id = SuchTorrent.generatePeerId();
+		return tor.getInitialTrackerRequest(peer_id, 6889).getURL();
+	}
+
 
 	public static void main(String[] args) {
-		TorrentInfo torrentFileInfo = null;
+		Torrent myTorrent = null;
 		if (args.length == 1) {
-			torrentFileInfo = getTorrentInfo(args[0]);
+			myTorrent = Torrent.buildTorrent(args[0]);
 		}
 
-		if (torrentFileInfo != null) {
-			System.out.println(torrentFileInfo.announce_url);
+		if (myTorrent != null) {
 			try {
-				String urlString = new String(torrentFileInfo.info_hash.array(), "UTF-8");
-				// String urlString = torrentFileInfo.info_hash.asCharBuffer().toString();
-				// System.out.println(torrentFileInfo.info_hash.asCharBuffer());
-				System.out.println(urlString);
-				System.out.println(URLEncoder.encode(urlString, "UTF-8"));
-				System.out.println(bytesToHex(torrentFileInfo.info_hash.array()));
-				System.out.println(bytesToHex(urlString.getBytes()));
+				// String urlString = new String(myTorrent.info_hash.array(), "ISO-8859-1");
+				// System.out.println(urlString);
+				// System.out.println("ISO-8859-1: " + URLEncoder.encode(urlString, "ISO-8859-1"));
+				// System.out.println(bytesToHex(myTorrent.info_hash.array()));
+				// System.out.println(bytesToHex(urlString.getBytes()));
 
 				String id = generatePeerId();
 				System.out.println(id);
+				// System.out.println(myTorrent.getInitialTrackerRequest().getURL());
+				System.out.println(getTrackerRequestURL(myTorrent));
 
 
 			} catch (Exception e) {
