@@ -10,8 +10,8 @@ class SuchTorrent {
 	public static String generatePeerId() {
 		char[] chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".toCharArray();
 		Random rando = new Random();
-		StringBuilder sb = new StringBuilder("-RU-");
-		for(int i = 0; i < 16; i++) {
+		StringBuilder sb = new StringBuilder("RU-");
+		for (int i = 0; i < 17; i++) {
 			sb.append(chars[rando.nextInt(chars.length)]);
 		}
 		try {
@@ -41,9 +41,10 @@ class SuchTorrent {
 
 		if (myTorrent != null) {
 			try {		
-				Map<String, Object> decodedData = myTorrent.getTrackerResponse();
+				Map<ByteBuffer, Object> decodedData = myTorrent.getTrackerResponse();
 				ToolKit.print(decodedData);
-				// decodedData.get();
+				ArrayList peers = (ArrayList)decodedData.get(TorrentHandler.KEY_PEERS);
+				ToolKit.print(peers);
 
 			} catch (Exception e) {
 				System.out.println("whatthefuck: " + e);
