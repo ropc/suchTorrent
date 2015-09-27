@@ -6,7 +6,7 @@ import java.net.*;
 import java.util.*;
 import GivenTools.*;
 
-class SuchTorrent {
+public class SuchTorrent {
 	public static String generatePeerId() {
 		char[] chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".toCharArray();
 		Random rando = new Random();
@@ -41,13 +41,8 @@ class SuchTorrent {
 
 		if (myTorrent != null) {
 			try {		
-				Map<ByteBuffer, Object> decodedData = myTorrent.getTrackerResponse();
-				ToolKit.print(decodedData);
-				ArrayList peers = (ArrayList)decodedData.get(TorrentHandler.KEY_PEERS);
-				ToolKit.print(peers);
-
+				myTorrent.start();
 			} catch (Exception e) {
-				System.out.println("whatthefuck: " + e);
 				e.printStackTrace();	
 			}
 		}

@@ -75,4 +75,25 @@ public class TorrentHandler {
 			return null;
 		}
 	}
+
+	public void start() {
+		Map<ByteBuffer, Object> decodedData = getTrackerResponse();
+		ToolKit.print(decodedData);
+		ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)decodedData.get(TorrentHandler.KEY_PEERS);
+		// ToolKit.print(peers);
+		for (Map<ByteBuffer, Object> peer : peers) {
+			ByteBuffer id = (ByteBuffer)peer.get(TorrentHandler.KEY_PEER_ID);
+			if (id != null) {
+				String peer_id = new String(id.array());
+				if (peer_id.substring(0, 3).compareTo("-RU") == 0)
+				{
+					// establish a connection with this peer
+					// this should be handled by another class
+
+					// for now, just printing
+					System.out.println(peer_id);
+				}
+			}
+		}
+	}
 }
