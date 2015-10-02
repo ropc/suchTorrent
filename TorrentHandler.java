@@ -91,7 +91,7 @@ public class TorrentHandler {
 					// this should be handled by another class
 
 					// for now, just printing
-					System.out.println(peer_id);
+					// System.out.println(peer_id);
 					Peer client = Peer.peerFromMap(peer);
 					client.handshake(info);
 

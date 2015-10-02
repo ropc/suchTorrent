@@ -32,9 +32,7 @@ public class Peer {
 	}
 
 	public void handshake(TorrentInfo info) {
-		Handshake myHandshake = new Handshake(info.info_hash.array(), peer_id.getBytes());
-		// byte[] handshake = Handshake.encode(info.info_hash.array(), peer_id.getBytes());
-		System.out.println("protocol is: " + myHandshake.protocol_str.toString());
+		Handshake myHandshake = new Handshake(info, peer_id);
 		if (sock == null) {
 			createSocket();
 		}
@@ -45,13 +43,13 @@ public class Peer {
 				DataInputStream input = new DataInputStream(sock.getInputStream());
 				output.write(myHandshake.array, 0, myHandshake.array.length);
 				input.read(peer_bytes);
-
-
-				// System.out.println(ph.);
-				// for (int i = 0; i < peerHandshake.length; i++) {
-				// 	// System.out.println(i);
-				// 	System.out.println(peerHandshake[i]);
-				// }
+				Handshake peerHandshake = Handshake.decode(peer_bytes);
+				if (myHandshake.info_hash.compareTo(peerHandshake.info_hash) == 0 &&
+					peer_id.equals(peerHandshake.peer_id)) {
+					System.out.println("peer is legit");
+				} else {
+					System.out.println("peer is a fake");
+				}
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
