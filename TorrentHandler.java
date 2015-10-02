@@ -7,6 +7,7 @@ import GivenTools.*;
 public class TorrentHandler {
 	public final TorrentInfo info;
 	public final String escaped_info_hash;
+	public Peer localPeer;
 	public String peer_id;
 	public int uploaded;
 	public int downloaded;
@@ -93,7 +94,7 @@ public class TorrentHandler {
 					// for now, just printing
 					// System.out.println(peer_id);
 					Peer client = Peer.peerFromMap(peer);
-					client.handshake(info);
+					client.handshake(info, peer_id);
 
 				}
 			}

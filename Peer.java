@@ -31,20 +31,20 @@ public class Peer {
 		}
 	}
 
-	public void handshake(TorrentInfo info) {
-		Handshake myHandshake = new Handshake(info, peer_id);
+	public void handshake(TorrentInfo info, String local_peer_id) {
+		Handshake localHandshake = new Handshake(info, local_peer_id);
 		if (sock == null) {
 			createSocket();
 		}
 		if (sock != null) {
-			byte[] peer_bytes = new byte[myHandshake.array.length];
+			byte[] peer_bytes = new byte[localHandshake.array.length];
 			try {
 				DataOutputStream output = new DataOutputStream(sock.getOutputStream());
 				DataInputStream input = new DataInputStream(sock.getInputStream());
-				output.write(myHandshake.array, 0, myHandshake.array.length);
+				output.write(localHandshake.array, 0, localHandshake.array.length);
 				input.read(peer_bytes);
 				Handshake peerHandshake = Handshake.decode(peer_bytes);
-				if (myHandshake.info_hash.compareTo(peerHandshake.info_hash) == 0 &&
+				if (localHandshake.info_hash.compareTo(peerHandshake.info_hash) == 0 &&
 					peer_id.equals(peerHandshake.peer_id)) {
 					System.out.println("peer is legit");
 				} else {
