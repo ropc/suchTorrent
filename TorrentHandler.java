@@ -92,6 +92,9 @@ public class TorrentHandler {
 
 					// for now, just printing
 					System.out.println(peer_id);
+					Peer client = Peer.peerFromMap(peer);
+					client.handshake(info);
+
 				}
 			}
 		}

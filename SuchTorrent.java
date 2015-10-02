@@ -1,7 +1,3 @@
-import java.io.*;
-import java.nio.*;
-import java.nio.file.*;
-import java.nio.charset.*;
 import java.net.*;
 import java.util.*;
 import GivenTools.*;
@@ -10,8 +6,8 @@ public class SuchTorrent {
 	public static String generatePeerId() {
 		char[] chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".toCharArray();
 		Random rando = new Random();
-		StringBuilder sb = new StringBuilder("RU-");
-		for (int i = 0; i < 17; i++) {
+		StringBuilder sb = new StringBuilder("-RU-");
+		for (int i = 0; i < 16; i++) {
 			sb.append(chars[rando.nextInt(chars.length)]);
 		}
 		try {
@@ -40,11 +36,7 @@ public class SuchTorrent {
 		}
 
 		if (myTorrent != null) {
-			try {		
-				myTorrent.start();
-			} catch (Exception e) {
-				e.printStackTrace();	
-			}
+			myTorrent.start();
 		}
 	}
 }
