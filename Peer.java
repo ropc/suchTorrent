@@ -32,21 +32,26 @@ public class Peer {
 	}
 
 	public void handshake(TorrentInfo info) {
-		byte[] handshake = Handshake.encode(info.info_hash.array(), peer_id.getBytes());
+		Handshake myHandshake = new Handshake(info.info_hash.array(), peer_id.getBytes());
+		// byte[] handshake = Handshake.encode(info.info_hash.array(), peer_id.getBytes());
+		System.out.println("protocol is: " + myHandshake.protocol_str.toString());
 		if (sock == null) {
 			createSocket();
 		}
 		if (sock != null) {
-			byte[] peerHandshake = new byte[handshake.length];
+			byte[] peer_bytes = new byte[myHandshake.array.length];
 			try {
 				DataOutputStream output = new DataOutputStream(sock.getOutputStream());
 				DataInputStream input = new DataInputStream(sock.getInputStream());
-				output.write(handshake, 0, handshake.length);
-				input.read(peerHandshake);
-				for (int i = 0; i < peerHandshake.length; i++) {
-					// System.out.println(i);
-					System.out.println(peerHandshake[i]);
-				}
+				output.write(myHandshake.array, 0, myHandshake.array.length);
+				input.read(peer_bytes);
+
+
+				// System.out.println(ph.);
+				// for (int i = 0; i < peerHandshake.length; i++) {
+				// 	// System.out.println(i);
+				// 	System.out.println(peerHandshake[i]);
+				// }
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
