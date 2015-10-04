@@ -4,7 +4,7 @@ import java.net.*;
 import java.util.*;
 import GivenTools.*;
 
-public class TorrentHandler {
+public class TorrentHandler implements PeerDelegate {
 	public final TorrentInfo info;
 	public final String escaped_info_hash;
 	public Peer localPeer;
@@ -45,7 +45,7 @@ public class TorrentHandler {
 		size = info.file_length;
 	}
 
-	public HttpURLConnection getInitialTrackerRequest(String peer_id, int port) {
+	public HttpURLConnection getInitialTrackerRequest(int port) {
 		StringBuilder urlString = new StringBuilder(info.announce_url.toString());
 		urlString.append("?info_hash=" + escaped_info_hash);
 		try {
@@ -65,7 +65,7 @@ public class TorrentHandler {
 	}
 
 	public Map<ByteBuffer, Object>getTrackerResponse() {
-		HttpURLConnection connection = getInitialTrackerRequest(peer_id, 6881);
+		HttpURLConnection connection = getInitialTrackerRequest(6881);
 		byte[] content = new byte[connection.getContentLength()];
 		try {
 			connection.getInputStream().read(content);
@@ -77,25 +77,29 @@ public class TorrentHandler {
 		}
 	}
 
+	public void peerDidHandshake(Peer peer, Boolean legit) {
+		System.out.println("O WOW SUCH JAVA");
+	}
+
 	public void start() {
 		Map<ByteBuffer, Object> decodedData = getTrackerResponse();
 		ToolKit.print(decodedData);
 		ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)decodedData.get(TorrentHandler.KEY_PEERS);
 		// ToolKit.print(peers);
-		for (Map<ByteBuffer, Object> peer : peers) {
-			ByteBuffer id = (ByteBuffer)peer.get(TorrentHandler.KEY_PEER_ID);
+		for (Map<ByteBuffer, Object> map_peer : peers) {
+			ByteBuffer id = (ByteBuffer)map_peer.get(TorrentHandler.KEY_PEER_ID);
 			if (id != null) {
-				String peer_id = new String(id.array());
-				if (peer_id.substring(0, 3).compareTo("-RU") == 0)
+				String new_peer_id = new String(id.array());
+				if (new_peer_id.substring(0, 3).compareTo("-RU") == 0)
 				{
 					// establish a connection with this peer
 					// this should be handled by another class
 
 					// for now, just printing
-					// System.out.println(peer_id);
-					Peer client = Peer.peerFromMap(peer);
+					// System.out.println(new_peer_id);
+					Peer client = Peer.peerFromMap(map_peer);
+					client.delegate = this;
 					client.handshake(info, peer_id);
-
 				}
 			}
 		}
