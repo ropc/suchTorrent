@@ -114,6 +114,17 @@ public class Peer {
 					}
 					System.out.print("\n");
 
+					byte[] requestMessage = Message.request(0, 0, 16384);
+					output.write(requestMessage);
+					output.flush();
+					System.out.println("message request: ");
+					for (byte muhByte : requestMessage) {
+						System.out.print(muhByte);
+						System.out.print(" ");
+					}
+					System.out.print("\n");
+
+
 					System.out.println("peer response:");
 					byte[] peerMessageBuffer = new byte[5];
 					while (input.read(peerMessageBuffer) != -1) {
