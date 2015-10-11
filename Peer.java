@@ -118,8 +118,8 @@ public class Peer {
 				}
 
 				System.out.println("peer response:");
-				for (byte i : messageBuffer) {
-					System.out.print(i + " ");
+				for (int i = 0; i < 100 && i < messageBuffer.length; i++) {
+					System.out.print(messageBuffer[i] + " ");
 				}
 				System.out.println("count: " + messageBuffer.length);
 				

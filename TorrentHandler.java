@@ -78,18 +78,30 @@ public class TorrentHandler {
 
 	public Boolean peerDidReceiveMessage(Peer peer, MessageData message) {
 		try {
+			byte[] requestMsg;
 			switch (message.type) {
 				case BITFIELD:
 					peer.send(Message.encodeMessage(Message.INTERESTED));
 					System.out.println("sent that i'm interested");
 					break;
 				case UNCHOKE:
-					byte[] requestMsg = Message.encodeMessage(Message.REQUEST, Message.buildRCTail(0, 0, info.piece_length));
+					requestMsg = Message.encodeMessage(Message.REQUEST, Message.buildRCTail(0, 0, info.piece_length));
 					peer.send(requestMsg);
 					System.out.println("sent request for piece 0");
 					for (byte muhByte : requestMsg)
 						System.out.print(muhByte + " ");
 					System.out.println();
+					break;
+				case PIECE:
+					int nextPiece = message.pieceIndex + 1;
+					requestMsg = Message.encodeMessage(Message.REQUEST, Message.buildRCTail(nextPiece, 0, info.piece_length));
+					peer.send(requestMsg);
+					System.out.println("sent request for piece " + nextPiece);
+					for (byte muhByte : requestMsg)
+						System.out.print(muhByte + " ");
+					System.out.println();
+					break;
+				default:
 					break;
 			}
 		} catch (Exception e) {
