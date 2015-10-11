@@ -6,35 +6,33 @@ import static java.nio.file.StandardOpenOption.*;
 public class Writer{
     FileChannel fileWriter;
     public Writer(String Filename){
-	Path file = Paths.get("");
-	file = FileSystems.getDefault().getPath(file.toAbsolutePath().toString(),Filename);
-        //System.err.println(file.toAbsolutePath().toString());
-	//file = FileSystems.getDefault().getPath(Filename);
+	Path file = Paths.get("");//Get the current directory's position.
+	file = FileSystems.getDefault().getPath(file.toAbsolutePath().toString(),Filename);//Get the absolute path of the present directory, and append the desired filename
 	try{	
 	File x = new File(file.toAbsolutePath().toString());
-	x.createNewFile();
-	fileWriter = FileChannel.open(file,READ,WRITE);
+	x.createNewFile();//create the new file with the specified name in the present directory [You can also say /fakefolder/filename to put it in a subdirectory of the present folder]
+	fileWriter = FileChannel.open(file,READ,WRITE);//Create a file writer for this new file
 	}catch(Exception e){System.err.println("ERROR OPENING FILE:");e.printStackTrace();}
     }
    
-    public void WriteData(int position, Byte data){
+    public void WriteData(int position, Byte data){//Write one byte at the specified location in the file. Will expand the file if necessary
         try{
 	byte[] x = new byte[1];
-	x[0]=data;
+	x[0]=data; //Catch the byte, and wrap it up to be written by the filewriter
 	ByteBuffer s = ByteBuffer.wrap(x);        
-        long pos = Long.valueOf(position);
-        fileWriter.write(s,pos);
+        long pos = Long.valueOf(position);//Don't you just love java datatype conversion?
+        fileWriter.write(s,pos);//Write the byte to the specified position
 	}catch(Exception e){System.err.println("ERROR WRITING TO FILE");}
     }
 
-    public void WriteData(int position, ByteBuffer writeall){
+    public void WriteData(int position, ByteBuffer writeall){//Write all of the buffer to the specified location in the file. Will expand the file if necessary
         try{
 	long pos = Long.valueOf(position);
         fileWriter.write(writeall,pos);
 	}catch(Exception e){System.err.println("ERROR WRITING TO FILE");}
     }
    
-    public void WriteData(int position, int offset, int numberToPrint, ByteBuffer writeFromHere){
+    public void WriteData(int position, int offset, int numberToPrint, ByteBuffer writeFromHere){//Write a subset of the buffer beginning @ offset and ending at offset+numbertoprint to the file. Will expand the file if necessary.
         long pos = Long.valueOf(position);
 	try{
 	byte[] x = new byte[numberToPrint];
