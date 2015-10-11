@@ -23,7 +23,7 @@ public class Tracker{
 	}
 	
 	
-	private HttpURLConnection TalkToTracker(int port){
+	private HttpURLConnection TalkToTracker(int port,int code){
 		StringBuilder urlString = new StringBuilder(URL);
 		urlString.append("?info_hash=" + escaped_info_hash);
 		try {
@@ -32,6 +32,9 @@ public class Tracker{
 			urlString.append("&uploaded=" + uploaded);
 			urlString.append("&downloaded=" + downloaded);
 			urlString.append("&left=" + (size-downloaded));
+			if(code==1){urlString.append("&event=started");}
+			if(code==2){urlString.append("&event=completed");}
+			if(code==3){urlString.append("&event=stopped");}
 			URL url = new URL(urlString.toString());
 			System.out.println(url);
 			HttpURLConnection urlConnection = (HttpURLConnection)url.openConnection();
@@ -42,14 +45,14 @@ public class Tracker{
 		}
 	}
 	
-	public Map<ByteBuffer, Object> getTrackerResponse(int Cuploaded, int Cdownloaded){
+	public Map<ByteBuffer, Object> getTrackerResponse(int Cuploaded, int Cdownloaded, int code){
 		uploaded = Cuploaded;
 		downloaded = Cdownloaded;
 		Map<ByteBuffer, Object> retval;	
-		HttpURLConnection connection = TalkToTracker(6881) ;
+		HttpURLConnection connection = TalkToTracker(6881,code) ;
 		int i=6881;
 		while(++i<=6889&&connection!=null){
-			connection = TalkToTracker(i);
+			connection = TalkToTracker(i,code);
 		}
 		if(connection==null){return null;}
 		
