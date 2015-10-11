@@ -12,18 +12,20 @@ public class Tracker{
 	private int uploaded;
 	private int downloaded;
 	public final static ByteBuffer KEY_INTERVAL = ByteBuffer.wrap(new byte[] { 'i', 'n', 't', 'e', 'r', 'v', 'a', 'l' });
+	public enum MessageType{GET,STARTED,STOPPED,COMPLETED}
+	public MessageType Event;	
 
-	
 	public  Tracker(String einfo, String peerid, String aURL,int filesize){
 		escaped_info_hash = einfo;
 		peer_id = peerid;
 		URL=aURL;
 		size=filesize;
+		Event=MessageType.STARTED;
 		return;
 	}
 	
 	
-	private HttpURLConnection TalkToTracker(int port,int code){
+	private HttpURLConnection TalkToTracker(int port){
 		StringBuilder urlString = new StringBuilder(URL);
 		urlString.append("?info_hash=" + escaped_info_hash);
 		try {
@@ -32,9 +34,11 @@ public class Tracker{
 			urlString.append("&uploaded=" + uploaded);
 			urlString.append("&downloaded=" + downloaded);
 			urlString.append("&left=" + (size-downloaded));
-			if(code==1){urlString.append("&event=started");}
-			if(code==2){urlString.append("&event=completed");}
-			if(code==3){urlString.append("&event=stopped");}
+			switch(Event){
+				case STARTED: {urlString.append("&event=started");break;}
+				case COMPLETED: {urlString.append("&event=completed");break;}
+				case STOPPED: {urlString.append("&event=stopped");break;}
+			}
 			URL url = new URL(urlString.toString());
 			System.out.println(url);
 			HttpURLConnection urlConnection = (HttpURLConnection)url.openConnection();
@@ -45,14 +49,14 @@ public class Tracker{
 		}
 	}
 	
-	public Map<ByteBuffer, Object> getTrackerResponse(int Cuploaded, int Cdownloaded, int code){
+	public Map<ByteBuffer, Object> getTrackerResponse(int Cuploaded, int Cdownloaded){
 		uploaded = Cuploaded;
 		downloaded = Cdownloaded;
 		Map<ByteBuffer, Object> retval;	
-		HttpURLConnection connection = TalkToTracker(6881,code) ;
+		HttpURLConnection connection = TalkToTracker(6881) ;
 		int i=6881;
 		while(++i<=6889&&connection!=null){
-			connection = TalkToTracker(i,code);
+			connection = TalkToTracker(i);
 		}
 		if(connection==null){return null;}
 		
