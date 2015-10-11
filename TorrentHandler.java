@@ -86,16 +86,18 @@ public class TorrentHandler {
 			if (message.length >= 5)
 				System.out.println("received message with id: " + message[4]);
 
-			if (message.length >= 5 && message[4] == 7) {
-				int pieceIndex = ByteBuffer.wrap(Arrays.copyOfRange(message, 5, 9)).getInt() + 1;
-				peer.send(Message.request(pieceIndex, 0, info.piece_length));
-				System.out.println("sent request for piece " + pieceIndex);
-			} else if (message.length >= 5 && message[4] == 5) {
-				peer.send(Message.INTERESTED);
-				System.out.println("sent message interested");
-				peer.send(Message.request(0, 0, info.piece_length));
-				System.out.println("sent message request for piece 0");
-			}
+			
+
+			// if (message.length >= 5 && message[4] == 7) {
+			// 	int pieceIndex = ByteBuffer.wrap(Arrays.copyOfRange(message, 5, 9)).getInt() + 1;
+			// 	peer.send(Message.request(pieceIndex, 0, info.piece_length));
+			// 	System.out.println("sent request for piece " + pieceIndex);
+			// } else if (message.length >= 5 && message[4] == 5) {
+			// 	peer.send(Message.INTERESTED);
+			// 	System.out.println("sent message interested");
+			// 	peer.send(Message.request(0, 0, info.piece_length));
+			// 	System.out.println("sent message request for piece 0");
+			// }
 			// peer.send(Message.request(0, 0, info.piece_length));
 		} catch (Exception e) {
 			e.printStackTrace();
