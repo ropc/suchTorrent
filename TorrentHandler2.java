@@ -52,7 +52,7 @@ public class TorrentHandler2 implements PeerDelegate {
 
 	public void start() {
 		Tracker aTracker = new Tracker(escaped_info_hash,peer_id,info.announce_url.toString(),size);
-		Map<ByteBuffer, Object> decodedData = aTracker.getTrackerResponse(uploaded,downloaded);
+		Map<ByteBuffer, Object> decodedData = aTracker.getTrackerResponse(uploaded,downloaded,0);
 		ToolKit.print(decodedData);
 		ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)decodedData.get(TorrentHandler2.KEY_PEERS);
 		// ToolKit.print(peers);
