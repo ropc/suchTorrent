@@ -12,11 +12,11 @@ public class Peer {
 	public Socket sock;
 	private DataInputStream input;
 	private DataOutputStream output;
-	private byte[] bitfield;
-	public Boolean isChocking;
-	public Boolean isInterested;
-	public Boolean amChocking;
-	public Boolean amInterested;
+	public byte[] bitfield;
+	protected Boolean isChocking;
+	protected Boolean isInterested;
+	protected Boolean amChocking;
+	protected Boolean amInterested;
 
 	public static Peer peerFromMap(Map<ByteBuffer, Object> peerMap) {
 		String ip = new String(((ByteBuffer)peerMap.get(TorrentHandler.KEY_IP)).array());
@@ -101,15 +101,16 @@ public class Peer {
 			try {
 				byte[] messageBuffer = new byte[4];
 				input.readFully(messageBuffer);
+				int messageLength = ByteBuffer.wrap(messageBuffer).getInt();
+				System.out.println();
 				System.out.print("reading first 4 bytes: ");
 				for (byte i : messageBuffer) {
 					System.out.print(i + " ");
 				}
-				int messageLength = ByteBuffer.wrap(messageBuffer).getInt();
 				System.out.println("to int:" + messageLength);
 
 				if (messageLength > 0) {
-					System.out.println("reading next " + messageLength + " bytes:");
+					// System.out.println("reading next " + messageLength + " bytes:");
 					byte[] newMsgBuf = new byte[4 + messageLength];
 					System.arraycopy(messageBuffer, 0, newMsgBuf, 0, 4);
 					input.readFully(newMsgBuf, 4, messageLength);
@@ -117,17 +118,35 @@ public class Peer {
 				}
 
 				System.out.println("peer response:");
-				// int a = 0;
-				// for (byte i : messageBuffer) {
-				// 	System.out.print(i + " ");
-				// 	a++;
-				// }
+				for (byte i : messageBuffer) {
+					System.out.print(i + " ");
+				}
 				System.out.println("count: " + messageBuffer.length);
 				
 				// this should be more like
 				// Message msg = Message.decode(messageBuffer)
 				// isReading = processMessage(msg)
-				isReading = delegate.peerDidReceiveMessage(this, messageBuffer);
+				MessageData message = new MessageData(messageBuffer);
+				System.out.println("message " + message.type.toString() + " came in");
+				switch (message.type) {
+					case BITFIELD:
+						bitfield = message.bitfield;
+						break;
+					case UNCHOKE:
+						setIsChocking(false);
+						break;
+					case CHOKE:
+						setIsChocking(true);
+						break;
+					case INTERESTED:
+						setIsInterested(true);
+						break;
+					case NOTINTERESTED:
+						setIsInterested(false);
+						break;
+				}
+
+				isReading = delegate.peerDidReceiveMessage(this, message);
 			} catch (Exception e) {
 				e.printStackTrace();
 				isReading = false;
@@ -166,60 +185,47 @@ public class Peer {
 					peerIsLegit = false;
 				}
 				delegate.peerDidHandshake(this, peerIsLegit);
-
-
-
-
-				/*////
-				System.out.println("peer handshake:");
-				for (byte muhByte : peerHandshake.array) {
-					System.out.print(muhByte);
-				}
-				System.out.print("\n");
-				////
-				Boolean peerIsLegit;
-				if (localHandshake.info_hash.compareTo(peerHandshake.info_hash) == 0 && peer_id.equals(peerHandshake.peer_id)) {
-					System.out.println("peer is legit");
-					peerIsLegit = true;
-					//////
-					output.write(Message.INTERESTED);
-					output.flush();
-
-					System.out.println("my message:");
-					for (byte muhByte : Message.INTERESTED) {
-						System.out.print(muhByte);
-					}
-					System.out.print("\n");
-
-					byte[] requestMessage = Message.request(0, 0, 16384);
-					output.write(requestMessage);
-					output.flush();
-					System.out.println("message request: ");
-					for (byte muhByte : requestMessage) {
-						System.out.print(muhByte);
-						System.out.print(" ");
-					}
-					System.out.print("\n");
-
-
-					System.out.println("peer response:");
-					byte[] peerMessageBuffer = new byte[5];
-					while (input.read(peerMessageBuffer) != -1) {
-						for (byte muhByte : peerMessageBuffer) {
-							System.out.print(muhByte);
-							System.out.print(" ");
-						}
-						// System.out.print("\n");
-					}
-					/////
-				} else {
-					System.out.println("peer is a fake");
-					peerIsLegit = false;
-				}
-				delegate.peerDidHandshake(this, peerIsLegit);*/
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
+	}
+
+	/**
+	 * getters/setters for choking/interested
+	 * some are protected as they should only be changed beacause
+	 * of incoming messages, which are processed by this class
+	 */
+
+	public Boolean getIsChocking() {
+		return isChocking;
+	}
+
+	protected void setIsChocking(Boolean value) {
+		isChocking = value;
+	}
+
+	public Boolean getAmChocking() {
+		return amChocking;
+	}
+
+	public void setAmChocking(Boolean value) {
+		amChocking = value;
+	}
+
+	public Boolean getIsInterested() {
+		return isInterested;
+	}
+
+	protected void setIsInterested(Boolean value) {
+		amChocking = value;
+	}
+
+	public Boolean getAmInterested() {
+		return amInterested;
+	}
+
+	public void setAmInterested(Boolean value) {
+		amChocking = value;
 	}
 }
