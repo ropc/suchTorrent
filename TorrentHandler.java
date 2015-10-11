@@ -2,10 +2,12 @@ import java.nio.*;
 import java.nio.file.*;
 import java.net.*;
 import java.util.*;
+import java.security.*;
 import GivenTools.*;
 
 public class TorrentHandler {
 	public final TorrentInfo info;
+	public Tracker tracker;
 	public final String escaped_info_hash;
 	public String local_peer_id;
 	public int uploaded;
@@ -42,37 +44,27 @@ public class TorrentHandler {
 		uploaded = 0;
 		downloaded = 0;
 		size = info.file_length;
+		tracker = new Tracker(escaped_info_hash, peer_id, info.announce_url.toString(), size);
 	}
 
-	public HttpURLConnection getInitialTrackerRequest(int port) {
-		StringBuilder urlString = new StringBuilder(info.announce_url.toString());
-		urlString.append("?info_hash=" + escaped_info_hash);
-		try {
-			urlString.append("&peer_id=" + URLEncoder.encode(local_peer_id, "ISO-8859-1"));
-			urlString.append("&port=" + port);
-			urlString.append("&uploaded=" + uploaded);
-			urlString.append("&downloaded=" + downloaded);
-			urlString.append("&left=" + size);
-			URL url = new URL(urlString.toString());
-			System.out.println(url);
-			HttpURLConnection urlConnection = (HttpURLConnection)url.openConnection();
-			urlConnection.setRequestMethod("GET");
-			return urlConnection;
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
-	public Map<ByteBuffer, Object>getTrackerResponse() {
-		HttpURLConnection connection = getInitialTrackerRequest(6881);
-		byte[] content = new byte[connection.getContentLength()];
-		try {
-			connection.getInputStream().read(content);
-			connection.getInputStream().close();
-			connection.disconnect();
-			return (Map<ByteBuffer, Object>)Bencoder2.decode(content);
-		} catch (Exception e) {
-			return null;
+	protected Boolean pieceIsCorrect(MessageData pieceMessage) {
+		if (pieceMessage.type == Message.PIECE) {
+			try {
+				MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
+				sha1.update(pieceMessage.message, 13, pieceMessage.message.length - 13);
+				byte[] generatedPieceHash = sha1.digest();
+				byte[] torrentFilePieceHash = info.piece_hashes[pieceMessage.pieceIndex].array();
+				if (Arrays.equals(generatedPieceHash, torrentFilePieceHash)) {
+					return true;
+				} else {
+					return false;
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+				return false;
+			}
+		} else {
+			return false;
 		}
 	}
 
@@ -93,7 +85,16 @@ public class TorrentHandler {
 					System.out.println();
 					break;
 				case PIECE:
-					int nextPiece = message.pieceIndex + 1;
+					int nextPiece;
+					if (pieceIsCorrect(message)) {
+						requestMsg = Message.encodeMessage(Message.HAVE, Message.buildHaveTail(message.pieceIndex));
+						peer.send(requestMsg);
+						System.out.println("sent HAVE piece " + message.pieceIndex + " to peer");
+						nextPiece = message.pieceIndex + 1;
+					} else {
+						System.out.println("piece " + message.pieceIndex + " was incorrect.");
+						nextPiece = message.pieceIndex;
+					}
 					requestMsg = Message.encodeMessage(Message.REQUEST, Message.buildRCTail(nextPiece, 0, info.piece_length));
 					peer.send(requestMsg);
 					System.out.println("sent request for piece " + nextPiece);
@@ -120,7 +121,7 @@ public class TorrentHandler {
 	}
 
 	public void start() {
-		Map<ByteBuffer, Object> decodedData = getTrackerResponse();
+		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
 		ToolKit.print(decodedData);
 		ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)decodedData.get(TorrentHandler.KEY_PEERS);
 		// ToolKit.print(peers);
