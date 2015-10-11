@@ -66,47 +66,56 @@ public class TorrentHandler {
 	}
 
 	public Boolean peerDidReceiveMessage(Peer peer, MessageData message) {
+		Boolean continueReading = false;
 		try {
-			byte[] requestMsg;
-			switch (message.type) {
-				case BITFIELD:
-					peer.send(Message.encodeMessage(Message.INTERESTED));
-					System.out.println("sent that i'm interested");
-					break;
-				case UNCHOKE:
-					requestMsg = Message.encodeMessage(Message.REQUEST, Message.buildRCTail(0, 0, info.piece_length));
+			byte[] requestMsg = null;
+			String outputString = "";
+			if (message.type == Message.BITFIELD) {
+				requestMsg = Message.encodeMessage(Message.INTERESTED);
+				outputString = "sent that i'm interested";
+			} else if (message.type == Message.UNCHOKE) {
+				requestMsg = Message.encodeMessage(Message.REQUEST, Message.buildRCTail(0, 0, info.piece_length));
+				outputString = "sent request for piece 0";
+			} else if (message.type == Message.PIECE) {
+				int nextPiece;
+				if (pieceIsCorrect(message)) {
+					requestMsg = Message.encodeMessage(Message.HAVE, Message.buildHaveTail(message.pieceIndex));
 					peer.send(requestMsg);
-					System.out.println("sent request for piece 0");
-					for (byte muhByte : requestMsg)
-						System.out.print(muhByte + " ");
-					System.out.println();
-					break;
-				case PIECE:
-					int nextPiece;
-					if (pieceIsCorrect(message)) {
-						requestMsg = Message.encodeMessage(Message.HAVE, Message.buildHaveTail(message.pieceIndex));
-						peer.send(requestMsg);
-						System.out.println("sent HAVE piece " + message.pieceIndex + " to peer");
-						nextPiece = message.pieceIndex + 1;
-					} else {
-						System.out.println("piece " + message.pieceIndex + " was incorrect.");
-						nextPiece = message.pieceIndex;
-					}
-					requestMsg = Message.encodeMessage(Message.REQUEST, Message.buildRCTail(nextPiece, 0, info.piece_length));
-					peer.send(requestMsg);
-					System.out.println("sent request for piece " + nextPiece);
-					for (byte muhByte : requestMsg)
-						System.out.print(muhByte + " ");
-					System.out.println();
-					break;
-				default:
-					break;
+					System.out.println("sent HAVE piece " + message.pieceIndex + " to peer");
+					requestMsg = null;
+					nextPiece = message.pieceIndex + 1;
+				} else {
+					System.out.println("piece " + message.pieceIndex + " was incorrect.");
+					nextPiece = message.pieceIndex;
+				}
+				if (nextPiece < info.piece_hashes.length) {
+					int pieceSize;
+					if (nextPiece == info.piece_hashes.length - 1)
+						pieceSize = size % info.piece_length;
+					else
+						pieceSize = info.piece_length;
+					requestMsg = Message.encodeMessage(Message.REQUEST, Message.buildRCTail(nextPiece, 0, pieceSize));
+					outputString = "sent request for piece " + nextPiece;
+				} else {
+					System.out.println("done downloading, disconnecting from peer: " + peer.peer_id);
+					peer.disconnect();
+				}
+			}
+			if (requestMsg != null) {
+				peer.send(requestMsg);
+				System.out.println(outputString);
+				for (byte muhByte : requestMsg)
+					System.out.print(muhByte + " ");
+				System.out.println();
+				continueReading = true;
+			} else {
+				continueReading = false;
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-			return false;
+			continueReading = false;
 		}
-		return true;
+		return continueReading;
 	}
 
 	public void peerDidHandshake(Peer peer, Boolean peerIsLegit) {
@@ -129,10 +138,6 @@ public class TorrentHandler {
 				if (new_peer_id.substring(0, 3).compareTo("-RU") == 0)
 				{
 					// establish a connection with this peer
-					// this should be handled by another class
-
-					// for now, just printing
-					// System.out.println(new_peer_id);
 					Peer client = Peer.peerFromMap(map_peer);
 					client.delegate = this;
 					client.handshake(info, local_peer_id);
