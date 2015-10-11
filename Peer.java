@@ -8,10 +8,11 @@ public class Peer {
 	public final String ip;
 	public final String peer_id;
 	public final int port;
-	public PeerDelegate delegate;
+	public TorrentHandler delegate;
 	public Socket sock;
 	private DataInputStream input;
 	private DataOutputStream output;
+	private byte[] bitfield;
 	public Boolean isChocking;
 	public Boolean isInterested;
 	public Boolean amChocking;
@@ -32,6 +33,7 @@ public class Peer {
 		isInterested = false;
 		amChocking = true;
 		amInterested = false;
+		bitfield = null;
 	}
 
 	public void connect() {
@@ -68,6 +70,72 @@ public class Peer {
 		}
 	}
 
+	public Handshake readHandshake() {
+		Handshake peerHandshake = null;
+		if (input != null) {
+			try {
+				byte pstrlen = input.readByte();
+				int totalLength = (int)pstrlen + 49;
+				// System.out.println("going to read handshake of total length: " + totalLength);
+				byte[] peer_bytes = new byte[totalLength];
+				peer_bytes[0] = pstrlen;
+				input.readFully(peer_bytes, 1, totalLength - 1);
+				peerHandshake = Handshake.decode(peer_bytes);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return peerHandshake;
+	}
+
+	public void send(byte[] message) throws IOException {
+		if (output != null) {
+			output.write(message);
+			output.flush();
+		}
+	}
+
+	public void startReading() {
+		Boolean isReading = true;
+		while (isReading) {
+			try {
+				byte[] messageBuffer = new byte[4];
+				input.readFully(messageBuffer);
+				System.out.print("reading first 4 bytes: ");
+				for (byte i : messageBuffer) {
+					System.out.print(i + " ");
+				}
+				int messageLength = ByteBuffer.wrap(messageBuffer).getInt();
+				System.out.println("to int:" + messageLength);
+
+				if (messageLength > 0) {
+					System.out.println("reading next " + messageLength + " bytes:");
+					byte[] newMsgBuf = new byte[4 + messageLength];
+					System.arraycopy(messageBuffer, 0, newMsgBuf, 0, 4);
+					input.readFully(newMsgBuf, 4, messageLength);
+					messageBuffer = newMsgBuf;
+				}
+
+				System.out.println("peer response:");
+				// int a = 0;
+				// for (byte i : messageBuffer) {
+				// 	System.out.print(i + " ");
+				// 	a++;
+				// }
+				System.out.println("count: " + messageBuffer.length);
+				
+				// this should be more like
+				// Message msg = Message.decode(messageBuffer)
+				// isReading = processMessage(msg)
+				isReading = delegate.peerDidReceiveMessage(this, messageBuffer);
+			} catch (Exception e) {
+				e.printStackTrace();
+				isReading = false;
+				disconnect();
+			}
+		}
+	}
+
 	public void handshake(TorrentInfo info, String local_peer_id) {
 		Handshake localHandshake = new Handshake(info, local_peer_id);
 		if (sock == null) {
@@ -88,12 +156,21 @@ public class Peer {
 				}
 				System.out.print("\n");
 				////
+				
+				Handshake peerHandshake = readHandshake();
+
+				Boolean peerIsLegit;
+				if (localHandshake.info_hash.compareTo(peerHandshake.info_hash) == 0 && peer_id.equals(peerHandshake.peer_id)) {
+					peerIsLegit = true;
+				} else {
+					peerIsLegit = false;
+				}
+				delegate.peerDidHandshake(this, peerIsLegit);
 
 
-				input.read(peer_bytes);
-				Handshake peerHandshake = Handshake.decode(peer_bytes);
 
-				////
+
+				/*////
 				System.out.println("peer handshake:");
 				for (byte muhByte : peerHandshake.array) {
 					System.out.print(muhByte);
@@ -132,14 +209,14 @@ public class Peer {
 							System.out.print(muhByte);
 							System.out.print(" ");
 						}
-						System.out.print("\n");
+						// System.out.print("\n");
 					}
 					/////
 				} else {
 					System.out.println("peer is a fake");
 					peerIsLegit = false;
 				}
-				delegate.peerDidHandshake(this, peerIsLegit);
+				delegate.peerDidHandshake(this, peerIsLegit);*/
 			} catch (Exception e) {
 				e.printStackTrace();
 			}

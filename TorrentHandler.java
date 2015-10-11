@@ -4,11 +4,10 @@ import java.net.*;
 import java.util.*;
 import GivenTools.*;
 
-public class TorrentHandler implements PeerDelegate {
+public class TorrentHandler {
 	public final TorrentInfo info;
 	public final String escaped_info_hash;
-	public Peer localPeer;
-	public String peer_id;
+	public String local_peer_id;
 	public int uploaded;
 	public int downloaded;
 	public int size;
@@ -39,7 +38,7 @@ public class TorrentHandler implements PeerDelegate {
 	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String peer_id) {
 		this.info = info;
 		this.escaped_info_hash = escaped_info_hash;
-		this.peer_id = peer_id;
+		local_peer_id = peer_id;
 		uploaded = 0;
 		downloaded = 0;
 		size = info.file_length;
@@ -49,7 +48,7 @@ public class TorrentHandler implements PeerDelegate {
 		StringBuilder urlString = new StringBuilder(info.announce_url.toString());
 		urlString.append("?info_hash=" + escaped_info_hash);
 		try {
-			urlString.append("&peer_id=" + URLEncoder.encode(peer_id, "ISO-8859-1"));
+			urlString.append("&peer_id=" + URLEncoder.encode(local_peer_id, "ISO-8859-1"));
 			urlString.append("&port=" + port);
 			urlString.append("&uploaded=" + uploaded);
 			urlString.append("&downloaded=" + downloaded);
@@ -77,8 +76,40 @@ public class TorrentHandler implements PeerDelegate {
 		}
 	}
 
-	public void peerDidHandshake(Peer peer, Boolean legit) {
-		System.out.println("O WOW SUCH JAVA");
+	public Boolean peerDidReceiveMessage(Peer peer, byte[] message) {
+		// System.out.println("torrent handler can see that peer has sent message:");
+		// for (byte i : message) {
+		// 	System.out.print(i + " ");
+		// }
+		// System.out.println();
+		try {
+			if (message.length >= 5)
+				System.out.println("received message with id: " + message[4]);
+
+			if (message.length >= 5 && message[4] == 7) {
+				int pieceIndex = ByteBuffer.wrap(Arrays.copyOfRange(message, 5, 9)).getInt() + 1;
+				peer.send(Message.request(pieceIndex, 0, info.piece_length));
+				System.out.println("sent request for piece " + pieceIndex);
+			} else if (message.length >= 5 && message[4] == 5) {
+				peer.send(Message.INTERESTED);
+				System.out.println("sent message interested");
+				peer.send(Message.request(0, 0, info.piece_length));
+				System.out.println("sent message request for piece 0");
+			}
+			// peer.send(Message.request(0, 0, info.piece_length));
+		} catch (Exception e) {
+			e.printStackTrace();
+			return false;
+		}
+		return true;
+	}
+
+	public void peerDidHandshake(Peer peer, Boolean peerIsLegit) {
+		if (peerIsLegit) {
+			peer.startReading();
+		} else {
+			System.out.println("handshake with peer " + peer.peer_id + " failed.");
+		}
 	}
 
 	public void start() {
@@ -99,7 +130,7 @@ public class TorrentHandler implements PeerDelegate {
 					// System.out.println(new_peer_id);
 					Peer client = Peer.peerFromMap(map_peer);
 					client.delegate = this;
-					client.handshake(info, peer_id);
+					client.handshake(info, local_peer_id);
 				}
 			}
 		}
