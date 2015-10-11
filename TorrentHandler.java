@@ -48,6 +48,7 @@ public class TorrentHandler {
 	}
 
 	protected Boolean pieceIsCorrect(MessageData pieceMessage) {
+		Boolean isCorrect = false;
 		if (pieceMessage.type == Message.PIECE) {
 			try {
 				MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
@@ -55,17 +56,13 @@ public class TorrentHandler {
 				byte[] generatedPieceHash = sha1.digest();
 				byte[] torrentFilePieceHash = info.piece_hashes[pieceMessage.pieceIndex].array();
 				if (Arrays.equals(generatedPieceHash, torrentFilePieceHash)) {
-					return true;
-				} else {
-					return false;
+					isCorrect = true;
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
-				return false;
 			}
-		} else {
-			return false;
 		}
+		return isCorrect;
 	}
 
 	public Boolean peerDidReceiveMessage(Peer peer, MessageData message) {
