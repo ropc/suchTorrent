@@ -72,14 +72,14 @@ public class Peer {
 
 	public Handshake readHandshake() {
 		Handshake peerHandshake = null;
-		if (sock != null) {
+		if (input != null) {
 			try {
 				byte pstrlen = input.readByte();
-				int totalLength = pstrlen + 49;
+				int totalLength = (int)pstrlen + 49;
 				// System.out.println("going to read handshake of total length: " + totalLength);
 				byte[] peer_bytes = new byte[totalLength];
 				peer_bytes[0] = pstrlen;
-				input.read(peer_bytes, 1, totalLength - 1);
+				input.readFully(peer_bytes, 1, totalLength - 1);
 				peerHandshake = Handshake.decode(peer_bytes);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -88,32 +88,41 @@ public class Peer {
 		return peerHandshake;
 	}
 
+	public void send(byte[] message) throws IOException {
+		if (output != null) {
+			output.write(message);
+			output.flush();
+		}
+	}
+
 	public void startReading() {
 		Boolean isReading = true;
 		while (isReading) {
 			try {
 				byte[] messageBuffer = new byte[4];
-				input.read(messageBuffer);
-				// System.out.print("reading first 4 bytes: ");
-				// for (byte i : messageBuffer) {
-				// 	System.out.print(i + " ");
-				// }
-				// System.out.println();
-
+				input.readFully(messageBuffer);
+				System.out.print("reading first 4 bytes: ");
+				for (byte i : messageBuffer) {
+					System.out.print(i + " ");
+				}
 				int messageLength = ByteBuffer.wrap(messageBuffer).getInt();
-				if (messageLength > 1) {
-					// System.out.println("reading next " + messageLength + " bytes:");
+				System.out.println("to int:" + messageLength);
+
+				if (messageLength > 0) {
+					System.out.println("reading next " + messageLength + " bytes:");
 					byte[] newMsgBuf = new byte[4 + messageLength];
 					System.arraycopy(messageBuffer, 0, newMsgBuf, 0, 4);
-					input.read(newMsgBuf, 4, messageLength);
+					input.readFully(newMsgBuf, 4, messageLength);
 					messageBuffer = newMsgBuf;
 				}
 
-				// System.out.println("peer response:");
+				System.out.println("peer response:");
+				// int a = 0;
 				// for (byte i : messageBuffer) {
 				// 	System.out.print(i + " ");
+				// 	a++;
 				// }
-				// System.out.println();
+				System.out.println("count: " + messageBuffer.length);
 				
 				// this should be more like
 				// Message msg = Message.decode(messageBuffer)
