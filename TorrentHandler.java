@@ -95,10 +95,10 @@ public class TorrentHandler implements PeerDelegate {
 			String outputString = "";
 			if (message.type == Message.BITFIELD) {
 				requestMsg = new MessageData(Message.INTERESTED);
-				outputString = "sening INTERESTED";
+				outputString = "sending INTERESTED";
 			} else if (message.type == Message.UNCHOKE) {
 				requestMsg = new MessageData(Message.REQUEST, 0, 0, info.piece_length);
-				outputString = "sening request for piece 0";
+				outputString = "sending request for piece 0";
 				System.out.println("notifying tracker will start to download");
 				tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STARTED);
 			} else if (message.type == Message.PIECE) {
@@ -106,7 +106,7 @@ public class TorrentHandler implements PeerDelegate {
 				if (pieceIsCorrect(message)) {
 					requestMsg = new MessageData(Message.HAVE, message.pieceIndex);
 					peer.send(requestMsg);
-					System.out.println("sening HAVE piece " + message.pieceIndex + " to peer");
+					System.out.println("sending HAVE piece " + message.pieceIndex + " to peer");
 					requestMsg = null;
 					all_pieces[message.pieceIndex] = message;
 					nextPiece = message.pieceIndex + 1;
@@ -119,7 +119,7 @@ public class TorrentHandler implements PeerDelegate {
 				if (nextPiece < info.piece_hashes.length) {
 					int pieceSize = getPieceSize(nextPiece);
 					requestMsg = new MessageData(Message.REQUEST, nextPiece, 0, pieceSize);
-					outputString = "sening request for piece " + nextPiece;
+					outputString = "sending request for piece " + nextPiece;
 				} else {
 					System.out.println("done downloading. notifying tracker.");
 					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
@@ -131,9 +131,9 @@ public class TorrentHandler implements PeerDelegate {
 			if (requestMsg != null) {
 				peer.send(requestMsg);
 				System.out.println(outputString);
-				for (byte muhByte : requestMsg.message)
-					System.out.print(muhByte + " ");
-				System.out.println();
+				// for (byte muhByte : requestMsg.message)
+				// 	System.out.print(muhByte + " ");
+				// System.out.println();
 				continueReading = true;
 			} else {
 				continueReading = false;
