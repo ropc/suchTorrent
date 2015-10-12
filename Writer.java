@@ -7,6 +7,12 @@ public class Writer{
 	private int pSize;//The piece size for the current torrent. Used by the message method.
     FileChannel fileWriter;
 
+/**
+*Creates a Writer object with a corresponding filename and piecesize
+*
+*@param filename = the name you want the file to be
+*@param pieceSize = Size of a Piece in this torrent
+*/
     public Writer(String filename, int pieceSize) throws IOException {
 		pSize = pieceSize;
 		Path file = Paths.get("");//Get the current directory's position.
@@ -20,7 +26,13 @@ public class Writer{
 			throw e;
 		}
     }
-   
+	
+/**
+*Writes a byte to a file at a given position
+*
+*@param position = the position in the file this byte is to be written to [bytes]
+*@param data = the byte to be written to the file
+*/
     public void writeData(int position, Byte data){//Write one byte at the specified location in the file. Will expand the file if necessary
         try{
 			byte[] x = new byte[1];
@@ -31,7 +43,13 @@ public class Writer{
 			fileWriter.write(s,pos);//Write the byte to the specified position
 		}catch(Exception e){System.err.println("ERROR WRITING TO FILE");}
     }
-
+	
+/**
+*Writes an entire bytebuffer to a file at a given position
+*
+*@param position = the position in the file this byte is to be written to [bytes]
+*@param writeall = the bytebuffer that is to be written to the file
+*/
     public void writeData(int position, ByteBuffer writeall){//Write all of the buffer to the specified location in the file. Will expand the file if necessary
         try{
 			long pos = Long.valueOf(position);//Same as above but the data is already formatted for the FileChannel
@@ -39,7 +57,14 @@ public class Writer{
 		}catch(Exception e){System.err.println("ERROR WRITING TO FILE");}
     }
 
-   //Write a subset of the buffer beginning @ offset and ending at offset+numbertoprint to the file. Will expand the file if necessary.
+/**
+*Write a subset of the buffer beginning @ offset and ending at offset+numbertoprint to the file. Will expand the file if necessary.  
+*@param position = the position in the file this byte is to be written to [bytes]
+*@param offset = the beginning index of the elements you want to write from the bytebuffer
+*@param numberToPrint = The number of bytes you want to print from the bytebuffer
+*@param writeFromHere = the bytebuffer that is to be written to the file
+*
+*/
     public void writeData(int position, int offset, int numberToPrint, ByteBuffer writeFromHere){
         long pos = Long.valueOf(position);
 		try{
@@ -53,7 +78,11 @@ public class Writer{
 		}catch(Exception e){System.err.println("ERROR WRITING TO FILE");}
     }
 	
-    //Write a given message to the file. Has already been checked for validity. Only usable when we get a message=piecesize
+/**
+*Write a given message to the file. Has already been checked for validity. Only usable when we get a message=piecesize
+*    
+*@param array = the message to be written to the disc [contains all the data needed for position, as well as the data itself]
+*/
     public void writeMessage(byte[] array){
 		int msgLength = ByteBuffer.wrap(array).getInt();		//Get the length of the data to be written.
 		byte[] block = new byte[msgLength-9];					//Create a byte array to hold that data.
