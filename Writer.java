@@ -4,8 +4,9 @@ import java.nio.channels.FileChannel;
 import java.io.*;
 import static java.nio.file.StandardOpenOption.*;
 public class Writer{
-	private int pSize;
+	private int pSize;//The piece size for the current torrent. Used by the message method.
     FileChannel fileWriter;
+
     public Writer(String filename, int pieceSize) throws IOException {
 		pSize = pieceSize;
 		Path file = Paths.get("");//Get the current directory's position.
@@ -22,41 +23,46 @@ public class Writer{
    
     public void writeData(int position, Byte data){//Write one byte at the specified location in the file. Will expand the file if necessary
         try{
-	byte[] x = new byte[1];
-	x[0]=data; //Catch the byte, and wrap it up to be written by the filewriter
-	ByteBuffer s = ByteBuffer.wrap(x);        
-        long pos = Long.valueOf(position);//Don't you just love java datatype conversion?
-        fileWriter.write(s,pos);//Write the byte to the specified position
-	}catch(Exception e){System.err.println("ERROR WRITING TO FILE");}
+			byte[] x = new byte[1];
+			x[0]=data; //Catch the byte, and wrap it up to be written by the filewriter
+			ByteBuffer s = ByteBuffer.wrap(x);
+			
+        	long pos = Long.valueOf(position);//Don't you just love java datatype conversion?
+			fileWriter.write(s,pos);//Write the byte to the specified position
+		}catch(Exception e){System.err.println("ERROR WRITING TO FILE");}
     }
 
     public void writeData(int position, ByteBuffer writeall){//Write all of the buffer to the specified location in the file. Will expand the file if necessary
         try{
-	long pos = Long.valueOf(position);
-        fileWriter.write(writeall,pos);
-	}catch(Exception e){System.err.println("ERROR WRITING TO FILE");}
+			long pos = Long.valueOf(position);//Same as above but the data is already formatted for the FileChannel
+        	fileWriter.write(writeall,pos);
+		}catch(Exception e){System.err.println("ERROR WRITING TO FILE");}
     }
-   
-    public void writeData(int position, int offset, int numberToPrint, ByteBuffer writeFromHere){//Write a subset of the buffer beginning @ offset and ending at offset+numbertoprint to the file. Will expand the file if necessary.
+
+   //Write a subset of the buffer beginning @ offset and ending at offset+numbertoprint to the file. Will expand the file if necessary.
+    public void writeData(int position, int offset, int numberToPrint, ByteBuffer writeFromHere){
         long pos = Long.valueOf(position);
-	try{
-	byte[] x = new byte[numberToPrint];
-	int i;
-	for(i=0;i<numberToPrint;i++){x[i]=(writeFromHere.get(i+offset));}
-	ByteBuffer s = ByteBuffer.wrap(x);
-	fileWriter.write(s,pos);
-	}catch(Exception e){System.err.println("ERROR WRITING TO FILE");}
+		try{
+			byte[] x = new byte[numberToPrint];//Create a byte array to hold the subset of the bytebuffer you want to read from
+			
+			int i;
+			for(i=0;i<numberToPrint;i++){x[i]=(writeFromHere.get(i+offset));}//Walk across the bytebuffer for the specified length and copy to x
+			
+			ByteBuffer s = ByteBuffer.wrap(x);//wrap x up and send it to the fileWriter.
+			fileWriter.write(s,pos);
+		}catch(Exception e){System.err.println("ERROR WRITING TO FILE");}
     }
 	
     //Write a given message to the file. Has already been checked for validity. Only usable when we get a message=piecesize
     public void writeMessage(byte[] array){
-	int msgLength = ByteBuffer.wrap(array).getInt();
-	byte[] block = new byte[msgLength-9];
-	System.arraycopy(array, 13, block, 0, msgLength-9);
-	int pieceIndex = ByteBuffer.wrap(array,5,4).getInt();
-	int beginIndex = ByteBuffer.wrap(array,9,4).getInt();
-	int position = ((pSize*pieceIndex) + beginIndex);
-	writeData(position,ByteBuffer.wrap(block));
+		int msgLength = ByteBuffer.wrap(array).getInt();		//Get the length of the data to be written.
+		byte[] block = new byte[msgLength-9];					//Create a byte array to hold that data.
+		System.arraycopy(array, 13, block, 0, msgLength-9);		//copy the data into this block.
+		int pieceIndex = ByteBuffer.wrap(array,5,4).getInt();	//Get the piece number that this data is from.
+		int beginIndex = ByteBuffer.wrap(array,9,4).getInt();	//Get the offset within that piece.
+		int position = ((pSize*pieceIndex) + beginIndex);		//Calculate the final position in the file from the above data
+		
+		writeData(position,ByteBuffer.wrap(block));				//Write the data to the file
     }
 
    

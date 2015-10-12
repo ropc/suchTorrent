@@ -59,14 +59,19 @@ public class Tracker{
 	}
 	
 	public Map<ByteBuffer, Object> getTrackerResponse(int Cuploaded, int Cdownloaded){//Send a message to the tracker and wait on a response. Return the decoded response.
-		uploaded = Cuploaded;
-		downloaded = Cdownloaded;
-		Map<ByteBuffer, Object> retval;	
-		HttpURLConnection connection = TalkToTracker(6881) ;
+		uploaded = Cuploaded;		
+		downloaded = Cdownloaded;		//Update the uploaded and downloaded amounts
+		Map<ByteBuffer, Object> retval;	//The Map that will be returned at the end of the method.
+		
+		boolean flag=true;
 		int i=6881;
-		boolean flag=false;
+	
+		HttpURLConnection connection = TalkToTracker(i);//begin by trying to connect at the lowest port number.
+		try{connection.connect();}							//Try and connect to this version of the connection
+		catch(Exception e){flag=false;}					//if it doesn't work, set the flag to false and enter the while loop [goes to false if connection is null as well]
+		
 		while(++i<=6889&&(connection==null||!flag)){//try connection until you either get a connection or run out of valid ports to try on
-			connection = TalkToTracker(i);
+			connection = TalkToTracker(i);			
 			flag=true;
 			try{connection.connect();}
 			catch(Exception e){flag = false;}
@@ -89,11 +94,19 @@ public class Tracker{
 	
 	public void StopCall(int Cuploaded, int Cdownloaded){
 		int i=6881;
+		
 		uploaded = Cuploaded;
-		downloaded = Cdownloaded;
-		Event=MessageType.STOPPED;	
-		HttpURLConnection connection = TalkToTracker(i);
-		boolean flag=false;
+		downloaded = Cdownloaded;//Update the uploaded and downloaded amounts
+		
+		
+		Event=MessageType.STOPPED;	//Change the message type to stopped
+		boolean flag=true;
+		
+		HttpURLConnection connection = TalkToTracker(i);//Send a stopped message to the tracker
+		try{connection.connect();}			//As above try once then if it fails try in a loop
+		catch(Exception e){flag = false;}
+			
+		
 		while(++i<=6889&&(connection==null||!flag)){//try connection until you either get a connection or run out of valid ports to try on
 			connection = TalkToTracker(i);
 			flag=true;
@@ -102,6 +115,6 @@ public class Tracker{
 			}
 		if(connection==null){return;}
 		
-		}
+		}	
 		
 }
