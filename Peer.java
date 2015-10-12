@@ -4,6 +4,13 @@ import java.nio.*;
 import java.util.*;
 import GivenTools.*;
 
+/**
+ * A peer that conforms to the BitTorrent protocol
+ * This peer will provide an interface to a peer for the
+ * TorrentHandler delegate. It will call methods on this delegate
+ * to notify it when certain events have occurred, such as
+ * a message has been received.
+ */
 public class Peer {
 	public final String ip;
 	public final String peer_id;
@@ -18,17 +25,18 @@ public class Peer {
 	protected Boolean amChocking;
 	protected Boolean amInterested;
 
-	public static Peer peerFromMap(Map<ByteBuffer, Object> peerMap) {
+	public static Peer peerFromMap(Map<ByteBuffer, Object> peerMap, TorrentHandler delegate) {
 		String ip = new String(((ByteBuffer)peerMap.get(Tracker.KEY_IP)).array());
 		String peer_id = new String(((ByteBuffer)peerMap.get(Tracker.KEY_PEER_ID)).array());
 		int port = (int)peerMap.get(Tracker.KEY_PORT);
-		return new Peer(ip, peer_id, port);
+		return new Peer(ip, peer_id, port, delegate);
 	}
 
-	public Peer(String ip, String peer_id, int port) {
+	public Peer(String ip, String peer_id, int port, TorrentHandler delegate) {
 		this.ip = ip;
 		this.peer_id = peer_id;
 		this.port = port;
+		this.delegate = delegate;
 		isChocking = true;
 		isInterested = false;
 		amChocking = true;
@@ -43,6 +51,7 @@ public class Peer {
 			input = new DataInputStream(sock.getInputStream());
 		} catch (Exception e) {
 			e.printStackTrace();
+			delegate.peerDidFailToConnect(this);
 		}
 	}
 
@@ -155,16 +164,17 @@ public class Peer {
 		}
 	}
 
-	public void handshake(TorrentInfo info, String local_peer_id) {
-		Handshake localHandshake = new Handshake(info, local_peer_id);
+	public void start(TorrentInfo info, String local_peer_id) {
 		if (sock == null) {
 			connect();
 		}
+		handshake(info, local_peer_id);
+	}
+
+	protected void handshake(TorrentInfo info, String local_peer_id) {
 		if (sock != null) {
-			byte[] peer_bytes = new byte[localHandshake.array.length];
+			Handshake localHandshake = new Handshake(info, local_peer_id);
 			try {
-				// DataOutputStream output = new DataOutputStream(sock.getOutputStream());
-				// DataInputStream input = new DataInputStream(sock.getInputStream());
 				output.write(localHandshake.array);
 				output.flush();
 

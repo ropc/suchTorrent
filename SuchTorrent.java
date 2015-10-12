@@ -30,6 +30,8 @@ public class SuchTorrent {
 		TorrentHandler myTorrent = null;
 		if (args.length == 1) {
 			myTorrent = TorrentHandler.buildTorrent(args[0]);
+		} else {
+			System.err.println("Client takes in exactly 2 arguments: TorrentFile, SaveFileName");
 		}
 
 		if (myTorrent != null) {

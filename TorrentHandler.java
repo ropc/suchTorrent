@@ -121,6 +121,10 @@ public class TorrentHandler {
 		}
 	}
 
+	public void peerDidFailToConnect(Peer peer) {
+		System.err.println("Could not connect to peer " + peer.peer_id + " at ip: " + peer.ip);
+	}
+
 	public void start() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
 		ToolKit.print(decodedData);
@@ -133,9 +137,8 @@ public class TorrentHandler {
 				if (new_peer_id.substring(0, 3).compareTo("-RU") == 0)
 				{
 					// establish a connection with this peer
-					Peer client = Peer.peerFromMap(map_peer);
-					client.delegate = this;
-					client.handshake(info, local_peer_id);
+					Peer client = Peer.peerFromMap(map_peer, this);
+					client.start(info, local_peer_id);
 				}
 			}
 		}
