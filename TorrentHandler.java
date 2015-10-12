@@ -1,3 +1,6 @@
+/**
+ * Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
+ */
 import java.io.*;
 import java.nio.*;
 import java.nio.file.*;

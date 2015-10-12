@@ -1,3 +1,6 @@
+/**
+ * Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
+ */
 import java.net.*;
 import java.util.*;
 import GivenTools.*;
@@ -20,7 +23,8 @@ public class RUBTClient {
 			try {
 				newSocket = new ServerSocket(port);
 			} catch (Exception e) {
-				System.out.println("Could not open port" + port);
+				System.err.println(e.toString());
+            System.out.println("Could not open port" + port);
 			}
 		}
 		return newSocket;

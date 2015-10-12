@@ -1,3 +1,6 @@
+/**
+ * Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
+ */
 import java.nio.*;
 import java.net.*;
 import java.util.*;
@@ -47,7 +50,7 @@ public class Tracker{
 	*@param port = the port you want to try and connect on.
 	*return: The HttpUrlConnection object that can be used to connect to the tracker
 	*/
-	private HttpURLConnection TalkToTracker(int port){
+	private HttpURLConnection TalkToTracker(int port) {
 		StringBuilder urlString = new StringBuilder(URL);
 		urlString.append("?info_hash=" + escaped_info_hash);
 		try {
@@ -67,8 +70,9 @@ public class Tracker{
 			urlConnection.setRequestMethod("GET");
 			return urlConnection;
 		} catch (Exception e) {
-			return null;
-		}
+		   e.printStackTrace();
+		   return null;
+      }
 	}
 	/*
 	*An overload of the other getTrackerResponse method. Sets the message to its default state of UNDEFINED [not a special message]
@@ -92,31 +96,30 @@ public class Tracker{
 		int i=6881;
 	
 		HttpURLConnection connection = TalkToTracker(i);//begin by trying to connect at the lowest port number.
-		try{connection.connect();}							//Try and connect to this version of the connection
-		catch(Exception e){flag=false;}					//if it doesn't work, set the flag to false and enter the while loop [goes to false if connection is null as well]
-		
+		System.out.println("Trying to connect to tracker with listen on port: " + i);
+      try{connection.connect();}							//Try and connect to this version of the connection
+		catch(Exception e)   //if it doesn't work, set the flag to false and enter the while loop [goes to false if connection is null as well]
+         {
+            System.err.println(e.toString());
+            flag=false;
+         }							
 		while(++i<=6889&&(connection==null||!flag)){//try connection until you either get a connection or run out of valid ports to try on
+		   System.out.println("Trying again with listen on port: " + i);
 			connection = TalkToTracker(i);			
 			flag=true;
 			try{connection.connect();}
-			catch(Exception e){flag = false;}
-			}
-		
-		if(connection==null){
-			System.err.println("Bad connection to Tracker");
-			return null;
-			}//If there was no connection
-			
-		try{	
-		if(flag==false&&connection.getResponseCode()!=200){
-			System.err.print("Connection Returned Error:"+connection.getResponseMessage());
-			return null;
+			catch(Exception e){
+            System.err.println(e.toString());
+            flag = false;
+         }
 		}
-		}catch(Exception e ){
-			e.printStackTrace();
-			System.err.print("Bad connection to Tracker!");
-			return null;
-				    }
+
+      if (flag == false){
+         System.err.println("Gave up trying to connect to Tracker");
+         System.err.println("Shutting down...");
+         throw new RuntimeException("Cannot recover if tracker is unreachable");
+      }
+
 		byte[] content = new byte[connection.getContentLength()];
 		try {
 			connection.getInputStream().read(content);	//read in the message sent by the tracker
@@ -131,8 +134,5 @@ public class Tracker{
 			System.err.println("Error happened while reading data sent from the server!");
 			return null;
 		}
-		
 	}
-	
-		
 }
