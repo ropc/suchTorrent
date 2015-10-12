@@ -80,6 +80,14 @@ public class TorrentHandler implements PeerDelegate {
 		return pieceSize;
 	}
 
+	/**
+	 * this is called by the peer when a message is recieved
+	 * the return value indicates whether or not the peer should
+	 * continue trying to read from its socket
+	 * @param  peer    peer that sent this message
+	 * @param  message the MessageData object containing information about the message
+	 * @return         true if peer should continue reading, false if not
+	 */
 	public Boolean peerDidReceiveMessage(Peer peer, MessageData message) {
 		Boolean continueReading = false;
 		try {

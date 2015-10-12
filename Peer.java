@@ -24,6 +24,13 @@ public class Peer {
 	protected Boolean amChocking;
 	protected Boolean amInterested;
 
+	/**
+	 * create a Peer from a given HashMap that was decoded
+	 * from a Bencoded tracker response
+	 * @param  peerMap  HashMap containing peer info
+	 * @param  delegate PeerDelegate that will handle events relating to the given peer
+	 * @return          initialized Peer object
+	 */
 	public static Peer peerFromMap(Map<ByteBuffer, Object> peerMap, PeerDelegate delegate) {
 		String ip = new String(((ByteBuffer)peerMap.get(Tracker.KEY_IP)).array());
 		String peer_id = new String(((ByteBuffer)peerMap.get(Tracker.KEY_PEER_ID)).array());
@@ -31,6 +38,13 @@ public class Peer {
 		return new Peer(ip, peer_id, port, delegate);
 	}
 
+	/**
+	 * Peer constructor
+	 * @param  ip       ip address of the peer
+	 * @param  peer_id  peer id in a String
+	 * @param  port     port at which this peer is listening
+	 * @param  delegate PeerDelegate that will handle events
+	 */
 	public Peer(String ip, String peer_id, int port, PeerDelegate delegate) {
 		this.ip = ip;
 		this.peer_id = peer_id;
@@ -43,6 +57,11 @@ public class Peer {
 		bitfield = null;
 	}
 
+	/**
+	 * Connects to this peer.
+	 * Opens a socket and creates input/output streams
+	 * If fails, it notifies the PeerDelegate
+	 */
 	public void connect() {
 		try {
 			sock = new Socket(ip, port);
@@ -54,6 +73,11 @@ public class Peer {
 		}
 	}
 
+	/**
+	 * Disconnects this peer.
+	 * closes the input/output streams and the socket
+	 * for this peer
+	 */
 	public void disconnect() {
 		if (input != null) {
 			try {
@@ -78,6 +102,11 @@ public class Peer {
 		}
 	}
 
+	/**
+	 * Reads the input stream and will parse
+	 * a handshake.
+	 * @return the handshake it finds (handshake the peer sends)
+	 */
 	public Handshake readHandshake() {
 		Handshake peerHandshake = null;
 		if (input != null) {
@@ -96,6 +125,12 @@ public class Peer {
 		return peerHandshake;
 	}
 
+	/**
+	 * sends a MessageData if possible. Used primarily by the PeerDelegate
+	 * to send a message before listening again
+	 * @param  message     message to send
+	 * @throws IOException if any errors occur, they will be thrown
+	 */
 	public void send(MessageData message) throws IOException {
 		if (output != null && message != null && message.message != null) {
 			output.write(message.message);
@@ -103,6 +138,12 @@ public class Peer {
 		}
 	}
 
+	/**
+	 * main loop for Peer
+	 * continues to read from the input stream for as long as
+	 * delegate.peerDidReceiveMessage() returns true or the socket
+	 * is closed
+	 */
 	public void startReading() {
 		Boolean isReading = true;
 		while (isReading) {
@@ -111,11 +152,11 @@ public class Peer {
 				input.readFully(messageBuffer);
 				int messageLength = ByteBuffer.wrap(messageBuffer).getInt();
 				System.out.println();
-				System.out.print("reading first 4 bytes: ");
-				for (byte i : messageBuffer) {
-					System.out.print(i + " ");
-				}
-				System.out.println("to int:" + messageLength);
+				// System.out.print("reading first 4 bytes: ");
+				// for (byte i : messageBuffer) {
+				// 	System.out.print(i + " ");
+				// }
+				// System.out.println("to int:" + messageLength);
 
 				if (messageLength > 0) {
 					// System.out.println("reading next " + messageLength + " bytes:");
@@ -125,15 +166,12 @@ public class Peer {
 					messageBuffer = newMsgBuf;
 				}
 
-				System.out.println("peer response:");
-				for (int i = 0; i < 100 && i < messageBuffer.length; i++) {
-					System.out.print(messageBuffer[i] + " ");
-				}
-				System.out.println("count: " + messageBuffer.length);
-				
-				// this should be more like
-				// Message msg = Message.decode(messageBuffer)
-				// isReading = processMessage(msg)
+				// System.out.println("peer response:");
+				// for (int i = 0; i < 100 && i < messageBuffer.length; i++) {
+				// 	System.out.print(messageBuffer[i] + " ");
+				// }
+				// System.out.println("count: " + messageBuffer.length);
+
 				MessageData message = new MessageData(messageBuffer);
 				System.out.println("message " + message.type.toString() + " came in");
 				switch (message.type) {
@@ -163,6 +201,12 @@ public class Peer {
 		}
 	}
 
+	/**
+	 * method to start the connection to this peer and begin
+	 * communication by sending the handshake
+	 * @param info          torrentInfo
+	 * @param local_peer_id peer id for the local client (used to create the local handshake)
+	 */
 	public void start(TorrentInfo info, String local_peer_id) {
 		if (sock == null) {
 			connect();
@@ -170,6 +214,13 @@ public class Peer {
 		handshake(info, local_peer_id);
 	}
 
+	/**
+	 * will initiate the handshaking process by sending the local
+	 * handshake to the peer. also checks if the returning handshake is
+	 * correct. calls delegate to decide what to do next
+	 * @param info          info stored in the torrent file
+	 * @param local_peer_id local peer id used for creating the local handshake
+	 */
 	protected void handshake(TorrentInfo info, String local_peer_id) {
 		if (sock != null) {
 			Handshake localHandshake = new Handshake(info, local_peer_id);
@@ -178,11 +229,11 @@ public class Peer {
 				output.flush();
 
 				////
-				System.out.println("my handshake:");
-				for (byte muhByte : localHandshake.array) {
-					System.out.print(muhByte);
-				}
-				System.out.print("\n");
+				// System.out.println("my handshake:");
+				// for (byte muhByte : localHandshake.array) {
+				// 	System.out.print(muhByte + " ");
+				// }
+				// System.out.print("\n");
 				////
 				
 				Handshake peerHandshake = readHandshake();

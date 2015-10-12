@@ -98,8 +98,8 @@ public class Tracker{
 			interval = (Integer)retval.get(KEY_INTERVAL); //Set the interval
 			return retval;
 		} catch (Exception e) {
-			return null;
 			System.err.print("Error happened while reading data sent from the server!");
+			return null;
 		}
 		
 	}

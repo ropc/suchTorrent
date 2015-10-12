@@ -2,7 +2,7 @@ import java.net.*;
 import java.util.*;
 import GivenTools.*;
 
-public class SuchTorrent {
+public class RUBTClient {
 	public static String generatePeerId() {
 		char[] chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".toCharArray();
 		Random rando = new Random();
