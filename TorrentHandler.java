@@ -23,7 +23,8 @@ public class TorrentHandler {
 			String newInfoHash = URLEncoder.encode(new String(newInfo.info_hash.array(), "ISO-8859-1"), "ISO-8859-1");
 			newTorrent = new TorrentHandler(newInfo, newInfoHash, SuchTorrent.generatePeerId());
 		} catch (Exception e) {
-			System.out.println("could not create");
+			e.printStackTrace();
+			System.err.println("could not create torrent handler");
 		}
 		return newTorrent;
 	}
@@ -115,7 +116,8 @@ public class TorrentHandler {
 		if (peerIsLegit) {
 			peer.startReading();
 		} else {
-			System.out.println("handshake with peer " + peer.peer_id + " failed.");
+			System.err.println("handshake with peer " + peer.peer_id + " failed.");
+			peer.disconnect();
 		}
 	}
 

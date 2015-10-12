@@ -72,17 +72,19 @@ public class Handshake {
 		this.peer_id = peer_id;
 	}
 
-	public static byte[] encode(byte[] info_hash, byte[] peer_id, byte[] protocol_str) {
+	/**
+	 * creates a byte array that can be sent as a handshake
+	 * @param  info_hash    hash of the torrent (unescaped)
+	 * @param  peer_id      peer id of the creator
+	 * @param  protocol_str string identifier of the protocol
+	 * @return              handshake in a byte array
+	 */
+	protected static byte[] encode(byte[] info_hash, byte[] peer_id, byte[] protocol_str) {
 		byte[] handshake = new byte[1 + protocol_str.length + 8 + 20 + 20];
 		handshake[0] = (byte)protocol_str.length;
 		System.arraycopy(protocol_str, 0, handshake, 1, protocol_str.length);
 		System.arraycopy(info_hash, 0, handshake, (1 + protocol_str.length + 8), 20);
 		System.arraycopy(peer_id, 0, handshake, (1 + protocol_str.length + 8 + 20), 20);
-		
-		// for (int i = 0; i < handshake.length; i++) {
-		// 	// System.out.println(i);
-		// 	System.out.println(handshake[i]);
-		// }
 
 		return handshake;
 	}
