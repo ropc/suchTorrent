@@ -70,18 +70,18 @@ public class TorrentHandler {
 	public Boolean peerDidReceiveMessage(Peer peer, MessageData message) {
 		Boolean continueReading = false;
 		try {
-			byte[] requestMsg = null;
+			MessageData requestMsg = null;
 			String outputString = "";
 			if (message.type == Message.BITFIELD) {
-				requestMsg = Message.encodeMessage(Message.INTERESTED);
+				requestMsg = new MessageData(Message.INTERESTED);
 				outputString = "sent that i'm interested";
 			} else if (message.type == Message.UNCHOKE) {
-				requestMsg = Message.encodeMessage(Message.REQUEST, Message.buildRCTail(0, 0, info.piece_length));
+				requestMsg = new MessageData(Message.REQUEST, 0, 0, info.piece_length);
 				outputString = "sent request for piece 0";
 			} else if (message.type == Message.PIECE) {
 				int nextPiece;
 				if (pieceIsCorrect(message)) {
-					requestMsg = Message.encodeMessage(Message.HAVE, Message.buildHaveTail(message.pieceIndex));
+					requestMsg = new MessageData(Message.HAVE, message.pieceIndex);
 					peer.send(requestMsg);
 					System.out.println("sent HAVE piece " + message.pieceIndex + " to peer");
 					requestMsg = null;
@@ -97,7 +97,7 @@ public class TorrentHandler {
 						pieceSize = size % info.piece_length;
 					else
 						pieceSize = info.piece_length;
-					requestMsg = Message.encodeMessage(Message.REQUEST, Message.buildRCTail(nextPiece, 0, pieceSize));
+					requestMsg = new MessageData(Message.REQUEST, nextPiece, 0, pieceSize);
 					outputString = "sent request for piece " + nextPiece;
 				} else {
 					System.out.println("done downloading, disconnecting from peer: " + peer.peer_id);
@@ -107,7 +107,7 @@ public class TorrentHandler {
 			if (requestMsg != null) {
 				peer.send(requestMsg);
 				System.out.println(outputString);
-				for (byte muhByte : requestMsg)
+				for (byte muhByte : requestMsg.message)
 					System.out.print(muhByte + " ");
 				System.out.println();
 				continueReading = true;

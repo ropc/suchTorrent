@@ -88,9 +88,9 @@ public class Peer {
 		return peerHandshake;
 	}
 
-	public void send(byte[] message) throws IOException {
-		if (output != null) {
-			output.write(message);
+	public void send(MessageData message) throws IOException {
+		if (output != null && message != null && message.message != null) {
+			output.write(message.message);
 			output.flush();
 		}
 	}
