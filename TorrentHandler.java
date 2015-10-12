@@ -74,16 +74,16 @@ public class TorrentHandler {
 			String outputString = "";
 			if (message.type == Message.BITFIELD) {
 				requestMsg = new MessageData(Message.INTERESTED);
-				outputString = "sent that i'm interested";
+				outputString = "sening INTERESTED";
 			} else if (message.type == Message.UNCHOKE) {
 				requestMsg = new MessageData(Message.REQUEST, 0, 0, info.piece_length);
-				outputString = "sent request for piece 0";
+				outputString = "sening request for piece 0";
 			} else if (message.type == Message.PIECE) {
 				int nextPiece;
 				if (pieceIsCorrect(message)) {
 					requestMsg = new MessageData(Message.HAVE, message.pieceIndex);
 					peer.send(requestMsg);
-					System.out.println("sent HAVE piece " + message.pieceIndex + " to peer");
+					System.out.println("sening HAVE piece " + message.pieceIndex + " to peer");
 					requestMsg = null;
 					all_pieces[message.pieceIndex] = message;
 					nextPiece = message.pieceIndex + 1;
@@ -98,7 +98,7 @@ public class TorrentHandler {
 					else
 						pieceSize = info.piece_length;
 					requestMsg = new MessageData(Message.REQUEST, nextPiece, 0, pieceSize);
-					outputString = "sent request for piece " + nextPiece;
+					outputString = "sening request for piece " + nextPiece;
 				} else {
 					System.out.println("done downloading, disconnecting from peer: " + peer.peer_id);
 					peer.disconnect();
