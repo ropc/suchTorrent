@@ -1,3 +1,4 @@
+import java.io.*;
 import java.nio.*;
 import java.nio.file.*;
 import java.net.*;
@@ -13,15 +14,16 @@ public class TorrentHandler implements PeerDelegate {
 	public int uploaded;
 	public int downloaded;
 	public int size;
+	public Writer fileWriter;
 	public MessageData[] all_pieces;
 
 
-	public static TorrentHandler buildTorrent(String filename) {
+	public static TorrentHandler create(String torrentFilename, String saveFileName) {
 		TorrentHandler newTorrent = null;
 		try {
-			TorrentInfo newInfo = new TorrentInfo(Files.readAllBytes(Paths.get(filename)));
+			TorrentInfo newInfo = new TorrentInfo(Files.readAllBytes(Paths.get(torrentFilename)));
 			String newInfoHash = URLEncoder.encode(new String(newInfo.info_hash.array(), "ISO-8859-1"), "ISO-8859-1");
-			newTorrent = new TorrentHandler(newInfo, newInfoHash, SuchTorrent.generatePeerId());
+			newTorrent = new TorrentHandler(newInfo, newInfoHash, SuchTorrent.generatePeerId(), saveFileName);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.err.println("could not create torrent handler");
@@ -29,7 +31,7 @@ public class TorrentHandler implements PeerDelegate {
 		return newTorrent;
 	}
 
-	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String peer_id) {
+	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String peer_id, String saveFileName) throws IOException {
 		this.info = info;
 		this.escaped_info_hash = escaped_info_hash;
 		local_peer_id = peer_id;
@@ -38,6 +40,7 @@ public class TorrentHandler implements PeerDelegate {
 		size = info.file_length;
 		tracker = new Tracker(escaped_info_hash, peer_id, info.announce_url.toString(), size);
 		all_pieces = new MessageData[info.piece_hashes.length];
+		fileWriter = new Writer(saveFileName, info.piece_length);
 	}
 
 	protected Boolean pieceIsCorrect(MessageData pieceMessage) {
@@ -56,6 +59,25 @@ public class TorrentHandler implements PeerDelegate {
 			}
 		}
 		return isCorrect;
+	}
+
+	public void saveTofile() {
+		if (downloaded == info.file_length)
+			System.out.println("Downloaded everything =)");
+		else
+			System.out.println("didnt download everything?");
+		for (MessageData pieceData : all_pieces) {
+			fileWriter.writeMessage(pieceData.message);
+		}
+	}
+
+	public int getPieceSize(int pieceIndex) {
+		int pieceSize;
+		if (pieceIndex == info.piece_hashes.length - 1)
+			pieceSize = size % info.piece_length;
+		else
+			pieceSize = info.piece_length;
+		return pieceSize;
 	}
 
 	public Boolean peerDidReceiveMessage(Peer peer, MessageData message) {
@@ -78,21 +100,20 @@ public class TorrentHandler implements PeerDelegate {
 					requestMsg = null;
 					all_pieces[message.pieceIndex] = message;
 					nextPiece = message.pieceIndex + 1;
+					int pieceSize = getPieceSize(nextPiece);
+					downloaded += pieceSize;
 				} else {
 					System.out.println("piece " + message.pieceIndex + " was incorrect.");
 					nextPiece = message.pieceIndex;
 				}
 				if (nextPiece < info.piece_hashes.length) {
-					int pieceSize;
-					if (nextPiece == info.piece_hashes.length - 1)
-						pieceSize = size % info.piece_length;
-					else
-						pieceSize = info.piece_length;
+					int pieceSize = getPieceSize(nextPiece);
 					requestMsg = new MessageData(Message.REQUEST, nextPiece, 0, pieceSize);
 					outputString = "sening request for piece " + nextPiece;
 				} else {
 					System.out.println("done downloading, disconnecting from peer: " + peer.peer_id);
 					peer.disconnect();
+					saveTofile();
 				}
 			}
 			if (requestMsg != null) {

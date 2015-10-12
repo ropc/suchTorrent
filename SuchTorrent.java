@@ -28,8 +28,8 @@ public class SuchTorrent {
 
 	public static void main(String[] args) {
 		TorrentHandler myTorrent = null;
-		if (args.length == 1) {
-			myTorrent = TorrentHandler.buildTorrent(args[0]);
+		if (args.length == 2) {
+			myTorrent = TorrentHandler.create(args[0], args[1]);
 		} else {
 			System.err.println("Client takes in exactly 2 arguments: TorrentFile, SaveFileName");
 		}
