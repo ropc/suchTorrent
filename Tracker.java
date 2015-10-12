@@ -67,7 +67,7 @@ public class Tracker{
 		int i=6881;
 	
 		HttpURLConnection connection = TalkToTracker(i);//begin by trying to connect at the lowest port number.
-		try{connection.connect}							//Try and connect to this version of the connection
+		try{connection.connect();}							//Try and connect to this version of the connection
 		catch(Exception e){flag=false;}					//if it doesn't work, set the flag to false and enter the while loop [goes to false if connection is null as well]
 		
 		while(++i<=6889&&(connection==null||!flag)){//try connection until you either get a connection or run out of valid ports to try on
@@ -105,7 +105,7 @@ public class Tracker{
 		HttpURLConnection connection = TalkToTracker(i);//Send a stopped message to the tracker
 		try{connection.connect();}			//As above try once then if it fails try in a loop
 		catch(Exception e){flag = false;}
-			}
+			
 		
 		while(++i<=6889&&(connection==null||!flag)){//try connection until you either get a connection or run out of valid ports to try on
 			connection = TalkToTracker(i);
