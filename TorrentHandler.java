@@ -13,6 +13,7 @@ public class TorrentHandler {
 	public int uploaded;
 	public int downloaded;
 	public int size;
+	public MessageData[] all_pieces;
 
 	public final static ByteBuffer KEY_COMPLETE = ByteBuffer.wrap(new byte[] { 'c', 'o', 'm', 'p', 'l', 'e', 't', 'e'});
 	public final static ByteBuffer KEY_DOWNLOADED = ByteBuffer.wrap(new byte[] { 'd', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 'e', 'd' });
@@ -45,6 +46,7 @@ public class TorrentHandler {
 		downloaded = 0;
 		size = info.file_length;
 		tracker = new Tracker(escaped_info_hash, peer_id, info.announce_url.toString(), size);
+		all_pieces = new MessageData[info.piece_hashes.length];
 	}
 
 	protected Boolean pieceIsCorrect(MessageData pieceMessage) {
@@ -83,6 +85,7 @@ public class TorrentHandler {
 					peer.send(requestMsg);
 					System.out.println("sent HAVE piece " + message.pieceIndex + " to peer");
 					requestMsg = null;
+					all_pieces[message.pieceIndex] = message;
 					nextPiece = message.pieceIndex + 1;
 				} else {
 					System.out.println("piece " + message.pieceIndex + " was incorrect.");
