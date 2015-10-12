@@ -102,7 +102,7 @@ public class TorrentHandler implements PeerDelegate {
 			System.out.println("Downloaded everything. Writing to file.");
 			for (MessageData pieceData : all_pieces) {
 				fileWriter.writeMessage(pieceData.message);
-		}
+			}
 		} else
 			System.out.println("didnt download everything?");
 	}
@@ -111,7 +111,7 @@ public class TorrentHandler implements PeerDelegate {
 	 * get the piece size based on index.
 	 * only piece that is differently sized is the last piece
 	 * @param  pieceIndex index of this piece
-	 * @return            pieceSize, -1 if no such piece
+	 * @return            pieceSize, 0 if no such piece
 	 *                        (if index is beyond bounds of piece count)
 	 */
 	public int getPieceSize(int pieceIndex) {
@@ -121,7 +121,7 @@ public class TorrentHandler implements PeerDelegate {
 		else if (pieceIndex < info.piece_hashes.length)
 			pieceSize = info.piece_length;
 		else
-			pieceSize = -1;
+			pieceSize = 0;
 		return pieceSize;
 	}
 
@@ -155,8 +155,8 @@ public class TorrentHandler implements PeerDelegate {
 					requestMsg = null;
 					all_pieces[message.pieceIndex] = message;
 					nextPiece = message.pieceIndex + 1;
-					int pieceSize = getPieceSize(nextPiece);
-					downloaded += pieceSize;
+					downloaded += getPieceSize(message.pieceIndex);
+					// System.out.println("downloaded: " + downloaded + " picece size: " + getPieceSize(message.pieceIndex));
 				} else {
 					System.out.println("piece " + message.pieceIndex + " was incorrect.");
 					nextPiece = message.pieceIndex;
@@ -222,11 +222,13 @@ public class TorrentHandler implements PeerDelegate {
 	 * and parse through the tracker response to create a connection to
 	 * the peers that begin with "-RU".
 	 */
+	@SuppressWarnings("unchecked")
 	public void start() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
 		// ToolKit.print(decodedData);
 		if (decodedData != null) {
-			ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)decodedData.get(Tracker.KEY_PEERS);
+			Object value = decodedData.get(Tracker.KEY_PEERS);
+			ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)value;
 			// ToolKit.print(peers);
 			if (peers != null) {
 				for (Map<ByteBuffer, Object> map_peer : peers) {

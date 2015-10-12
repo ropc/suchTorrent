@@ -15,7 +15,7 @@ public class Tracker{
 	private int uploaded; // The amount that has been uploaded so far [since start message sent to tracker]
 	private int downloaded;// The amount that has been downloaded so far [since start message sent to tracker]
 	public enum MessageType{UNDEFINED,STARTED,STOPPED,COMPLETED} //The type of message that can be sent to the tracker
-	public MessageType Event; //The type of message that is to be sent to the tracker
+	public MessageType event; //The type of message that is to be sent to the tracker
 
 	public final static ByteBuffer KEY_COMPLETE = ByteBuffer.wrap(new byte[] { 'c', 'o', 'm', 'p', 'l', 'e', 't', 'e'});
 	public final static ByteBuffer KEY_DOWNLOADED = ByteBuffer.wrap(new byte[] { 'd', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 'e', 'd' });
@@ -40,12 +40,11 @@ public class Tracker{
 		peer_id = peerid;
 		URL=aURL;
 		size=filesize;
-		Event=MessageType.STARTED;
-		return;
+		event=MessageType.STARTED;
 	}
 	
 	/**
-	*Builds a message to be sent to the tracker. Message based on info in constructor and current status of Event
+	*Builds a message to be sent to the tracker. Message based on info in constructor and current status of event
 	*
 	*@param port = the port you want to try and connect on.
 	*return: The HttpUrlConnection object that can be used to connect to the tracker
@@ -59,10 +58,17 @@ public class Tracker{
 			urlString.append("&uploaded=" + uploaded);
 			urlString.append("&downloaded=" + downloaded);
 			urlString.append("&left=" + (size-downloaded));
-			switch(Event){
-				case STARTED: {urlString.append("&event=started");break;}		//optional parameters specifying the type of message
-				case COMPLETED: {urlString.append("&event=completed");break;}
-				case STOPPED: {urlString.append("&event=stopped");break;}
+			//optional parameters specifying the type of message
+			switch(event){
+				case STARTED:
+					urlString.append("&event=started");
+					break;
+				case COMPLETED:
+					urlString.append("&event=completed");
+					break;
+				case STOPPED:
+					urlString.append("&event=stopped");
+					break;
 			}
 			URL url = new URL(urlString.toString());
 			System.out.println(url);
@@ -72,7 +78,7 @@ public class Tracker{
 		} catch (Exception e) {
 		   e.printStackTrace();
 		   return null;
-      }
+	  }
 	}
 	/*
 	*An overload of the other getTrackerResponse method. Sets the message to its default state of UNDEFINED [not a special message]
@@ -86,8 +92,9 @@ public class Tracker{
 	*@param M = The type of the message you want to send to the tracker
 	*return: The map returned by the Tracker [decoded]
 	*/
+	@SuppressWarnings("unchecked")
 	public Map<ByteBuffer, Object> getTrackerResponse(int Cuploaded, int Cdownloaded, MessageType M){//Send a message to the tracker and wait on a response. Return the decoded response.
-		Event=M;
+		event=M;
 		uploaded = Cuploaded;		
 		downloaded = Cdownloaded;		//Update the uploaded and downloaded amounts
 		Map<ByteBuffer, Object> retval;	//The Map that will be returned at the end of the method.
@@ -97,28 +104,32 @@ public class Tracker{
 	
 		HttpURLConnection connection = TalkToTracker(i);//begin by trying to connect at the lowest port number.
 		System.out.println("Trying to connect to tracker with listen on port: " + i);
-      try{connection.connect();}							//Try and connect to this version of the connection
+		try{
+			connection.connect();	//Try and connect to this version of the connection
+		}
 		catch(Exception e)   //if it doesn't work, set the flag to false and enter the while loop [goes to false if connection is null as well]
-         {
-            System.err.println(e.toString());
-            flag=false;
-         }							
-		while(++i<=6889&&(connection==null||!flag)){//try connection until you either get a connection or run out of valid ports to try on
-		   System.out.println("Trying again with listen on port: " + i);
+		{
+			System.err.println(e.toString());
+			flag = false;
+		}							
+		//try connection until you either get a connection or run out of valid ports to try on
+		while(++i <= 6889 && (connection == null|| !flag)){
+			System.out.println("Trying again with listen on port: " + i);
 			connection = TalkToTracker(i);			
 			flag=true;
-			try{connection.connect();}
-			catch(Exception e){
-            System.err.println(e.toString());
-            flag = false;
-         }
+			try{
+				connection.connect();
+			} catch(Exception e) {
+				System.err.println(e.toString());
+				flag = false;
+			}
 		}
 
-      if (flag == false){
-         System.err.println("Gave up trying to connect to Tracker");
-         System.err.println("Shutting down...");
-         throw new RuntimeException("Cannot recover if tracker is unreachable");
-      }
+	  if (flag == false){
+		 System.err.println("Gave up trying to connect to Tracker");
+		 System.err.println("Shutting down...");
+		 throw new RuntimeException("Cannot recover if tracker is unreachable");
+	  }
 
 		byte[] content = new byte[connection.getContentLength()];
 		try {
@@ -127,7 +138,9 @@ public class Tracker{
 			connection.disconnect();
 			retval = (Map<ByteBuffer, Object>)Bencoder2.decode(content); //Decode the message
 			interval = (Integer)retval.get(KEY_INTERVAL); //Set the interval
-			if(retval==null){System.err.println("Bad response from server!");}
+			if (retval==null) {
+				System.err.println("Bad response from server!");
+			}
 			return retval;
 		} catch (Exception e) {		
 			e.printStackTrace();

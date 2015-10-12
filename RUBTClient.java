@@ -30,7 +30,7 @@ public class RUBTClient {
 				newSocket = new ServerSocket(port);
 			} catch (Exception e) {
 				System.err.println(e.toString());
-            System.out.println("Could not open port" + port);
+			System.out.println("Could not open port" + port);
 			}
 		}
 		return newSocket;
