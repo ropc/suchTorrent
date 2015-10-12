@@ -9,6 +9,9 @@ import java.util.*;
 import java.security.*;
 import GivenTools.*;
 
+/**
+ * 
+ */
 public class TorrentHandler implements PeerDelegate {
 	public final TorrentInfo info;
 	public Tracker tracker;
@@ -165,20 +168,28 @@ public class TorrentHandler implements PeerDelegate {
 
 	public void start() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
-		ToolKit.print(decodedData);
-		ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)decodedData.get(Tracker.KEY_PEERS);
-		// ToolKit.print(peers);
-		for (Map<ByteBuffer, Object> map_peer : peers) {
-			ByteBuffer id = (ByteBuffer)map_peer.get(Tracker.KEY_PEER_ID);
-			if (id != null) {
-				String new_peer_id = new String(id.array());
-				if (new_peer_id.substring(0, 3).compareTo("-RU") == 0)
-				{
-					// establish a connection with this peer
-					Peer client = Peer.peerFromMap(map_peer, this);
-					client.start(info, local_peer_id);
+		// ToolKit.print(decodedData);
+		if (decodedData != null) {
+			ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)decodedData.get(Tracker.KEY_PEERS);
+			// ToolKit.print(peers);
+			if (peers != null) {
+				for (Map<ByteBuffer, Object> map_peer : peers) {
+					ByteBuffer id = (ByteBuffer)map_peer.get(Tracker.KEY_PEER_ID);
+					if (id != null) {
+						String new_peer_id = new String(id.array());
+						if (new_peer_id.substring(0, 3).compareTo("-RU") == 0)
+						{
+							// establish a connection with this peer
+							Peer client = Peer.peerFromMap(map_peer, this);
+							client.start(info, local_peer_id);
+						}
+					}
 				}
+			} else {
+				System.err.println("Could not find key PEERS in decoded tracker response");
 			}
+		} else {
+			System.err.println("Tracker response came back empty, please try again.");
 		}
 	}
 }
