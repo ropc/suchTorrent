@@ -81,11 +81,11 @@ public enum Message {
 	        return outMessage;
 
 	     case PIECE:
-	        outMessage = new byte[(4 + 9) + messageTail.length];
-	        byte[] lengthPrefix = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(9 + messageTail.length).array();
+	        outMessage = new byte[(4 + 1) + messageTail.length];
+	        byte[] lengthPrefix = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt( 1 + messageTail.length).array();
 	        System.arraycopy(lengthPrefix, 0, outMessage, 0, 4);
-	        System.arraycopy(type.messageHead, 4, outMessage, 4, 9);
-	        System.arraycopy(messageTail, 0, outMessage, 13, messageTail.length);
+	        System.arraycopy(type.messageHead, 4, outMessage, 4, 1);
+	        System.arraycopy(messageTail, 0, outMessage, 5, messageTail.length);
 	        return outMessage;
 	     default:
 	        throw new RuntimeException("Type not recognized: " + type.toString());
@@ -108,12 +108,13 @@ public enum Message {
 	}
 
 	public static byte[] buildPieceTail(int index, int begin, byte[] block){
-	  byte[] message = new byte[8 + block.length];
+	  byte[] messageTail = new byte[8 + block.length];
 	  byte[] indexArray = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(index).array();
 	  byte[] beginArray = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(begin).array();
-	  System.arraycopy(beginArray, 0, indexArray, 4, 4);
-	  System.arraycopy(block, 0, indexArray, 8, block.length);
-	  return indexArray;
+	  System.arraycopy(indexArray, 0, messageTail, 0, 4);  
+     System.arraycopy(beginArray, 0, messageTail, 4, 4);
+	  System.arraycopy(block, 0, messageTail, 8, block.length);
+	  return messageTail;
 	}
 }
 
@@ -129,6 +130,105 @@ class MessageData{
 	public int blckLength;
 	public byte[] block;
    
+  
+   //Cascading intentional for switches
+
+   MessageData(Message i_type) throws IllegalArgumentException{
+      switch(i_type){
+         
+         case CHOKE: case UNCHOKE: case INTERESTED: case NOTINTERESTED:
+            msgLength = 1;
+            id = i_type.getMessageHead()[4];
+         case KEEPALIVE:
+            type = i_type;
+            message = Message.encodeMessage(type);
+            break;
+         
+         case HAVE: case BITFIELD: case REQUEST: case PIECE: case CANCEL:
+            throw new IllegalArgumentException("Wrong contructor used for Message type: " + i_type);
+         default:
+            throw new IllegalArgumentException("Unknown type: " + i_type);
+      }
+   } 
+
+   MessageData(Message i_type, int i_index){
+      switch (i_type){
+         case HAVE:
+            msgLength = 5;
+            id = 4;
+            pieceIndex = i_index;
+            type = i_type;
+            message = Message.encodeMessage(type, Message.buildHaveTail(pieceIndex));
+            break;
+         
+         case KEEPALIVE: case BITFIELD: case REQUEST: case PIECE: case CANCEL:
+         case CHOKE: case UNCHOKE: case INTERESTED: case NOTINTERESTED:
+            throw new IllegalArgumentException("Wrong constructor used for type: " + i_type);
+         default:
+            throw new IllegalArgumentException("Unknown type: " + i_type);
+      }
+   }     
+
+   MessageData(Message i_type, byte[] i_bitfield){
+      switch (i_type){
+         case BITFIELD:
+            msgLength = 1 + i_bitfield.length;
+            id = 5;
+            type = i_type;
+            bitfield = i_bitfield;
+            message = Message.encodeMessage(type, bitfield);
+            break;
+         
+         case KEEPALIVE: case HAVE: case REQUEST: case PIECE: case CANCEL:
+         case CHOKE: case UNCHOKE: case INTERESTED: case NOTINTERESTED:
+            throw new IllegalArgumentException("Wrong constructor used for type: " + i_type);
+         default:
+            throw new IllegalArgumentException("Unknown type: " + i_type);
+      }
+   }
+
+   MessageData(Message i_type, int i_index, int i_begin, int i_length){
+      switch (i_type){
+         case REQUEST:
+         case CANCEL:
+            type = i_type;
+            msgLength = 13;
+            id = i_type.getMessageHead()[4];
+            type = i_type;
+            pieceIndex = i_index;
+            beginIndex = i_begin;
+            blckLength = i_length;
+            message = Message.encodeMessage(type, Message.buildRCTail(pieceIndex, beginIndex, blckLength));
+            break;
+         
+         case KEEPALIVE: case HAVE: case CHOKE: case UNCHOKE: case BITFIELD:
+         case INTERESTED: case NOTINTERESTED: case PIECE:
+            throw new IllegalArgumentException("Wrong constructor used for type: " + i_type);
+         default:
+            throw new IllegalArgumentException("Unknown type: " + i_type);
+      }
+   }
+
+   MessageData(Message i_type, int i_index, int i_begin, byte[] i_block){
+      switch (i_type){
+         case PIECE:
+            type = i_type;
+            msgLength = 9 + i_block.length;
+            id = 7;
+            pieceIndex = i_index;
+            beginIndex = i_begin;
+            block = i_block;
+            message = Message.encodeMessage(type, Message.buildPieceTail(pieceIndex, beginIndex, block));
+            break;
+
+         case KEEPALIVE: case HAVE: case CHOKE: case UNCHOKE: case BITFIELD:
+         case INTERESTED: case NOTINTERESTED: case REQUEST: case CANCEL: 
+            throw new IllegalArgumentException("Wrong constructor used for type: " + i_type);
+         default:
+            throw new IllegalArgumentException("Unknown type: " + i_type);
+      }
+   }
+
 	MessageData(byte[] array) {
 		message = array;
 		type = Message.getType(array);
@@ -154,7 +254,7 @@ class MessageData{
 				break;
 			case HAVE:
 				pieceIndex = ByteBuffer.wrap(array, 5, 4).getInt();
-			    break;
+			   break;
 			default:
 				this.id = this.message[4];
 				break;
