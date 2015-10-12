@@ -99,6 +99,7 @@ public class Tracker{
 			return retval;
 		} catch (Exception e) {
 			return null;
+			System.err.print("Error happened while reading data sent from the server!");
 		}
 		
 	}
