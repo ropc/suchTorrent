@@ -10,7 +10,9 @@ import java.security.*;
 import GivenTools.*;
 
 /**
- * 
+ * TorrentHandler will take care of managing the peers,
+ * schedule communication to the tracker, and maintain the
+ * torrent data for a given torrent.
  */
 public class TorrentHandler implements PeerDelegate {
 	public final TorrentInfo info;
@@ -24,6 +26,14 @@ public class TorrentHandler implements PeerDelegate {
 	public MessageData[] all_pieces;
 
 
+	/**
+	 * create attempts to create a TorrentHandler out of a
+	 * given torrent file name and save file name
+	 * @param  torrentFilename name of the torrent file to be used
+	 * @param  saveFileName    name of the data file the torrent data will be written to
+	 * @return                 a properly initialized TorrentHandle if no errors,
+	 *                           if there are errors, it returns null
+	 */
 	public static TorrentHandler create(String torrentFilename, String saveFileName) {
 		TorrentHandler newTorrent = null;
 		try {
@@ -37,6 +47,16 @@ public class TorrentHandler implements PeerDelegate {
 		return newTorrent;
 	}
 
+	/**
+	 * TorrentHandler constructor, will throw if cannot initialize
+	 * all required fields
+	 * @param  info              TorrentInfo instance that describes the torrent to be downloaded
+	 * @param  escaped_info_hash used primarily for communications to the tracker
+	 * @param  peer_id           the peer_id to be used by this client
+	 * @param  saveFileName      name of the filename to be saved to
+	 * @throws IOException       will throw if cannot correctly initialize fileWriter
+	 *         						(which writes to the given filename)
+	 */
 	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String peer_id, String saveFileName) throws IOException {
 		this.info = info;
 		this.escaped_info_hash = escaped_info_hash;
@@ -49,6 +69,12 @@ public class TorrentHandler implements PeerDelegate {
 		fileWriter = new Writer(saveFileName, info.piece_length);
 	}
 
+	/**
+	 * Verifies the hash of a given piece inside a message
+	 * against the hash stored in the torrent file
+	 * @param  pieceMessage message containing the piece to be verified
+	 * @return              true if hashes match, false otherwise
+	 */
 	protected Boolean pieceIsCorrect(MessageData pieceMessage) {
 		Boolean isCorrect = false;
 		if (pieceMessage.type == Message.PIECE) {
@@ -67,22 +93,35 @@ public class TorrentHandler implements PeerDelegate {
 		return isCorrect;
 	}
 
+	/**
+	 * Called once download is completed, will only try to save
+	 * if the the download is complete.
+	 */
 	public void saveTofile() {
-		if (downloaded == info.file_length)
-			System.out.println("Downloaded everything =)");
-		else
-			System.out.println("didnt download everything?");
-		for (MessageData pieceData : all_pieces) {
-			fileWriter.writeMessage(pieceData.message);
+		if (downloaded == info.file_length) {
+			System.out.println("Downloaded everything. Writing to file.");
+			for (MessageData pieceData : all_pieces) {
+				fileWriter.writeMessage(pieceData.message);
 		}
+		} else
+			System.out.println("didnt download everything?");
 	}
 
+	/**
+	 * get the piece size based on index.
+	 * only piece that is differently sized is the last piece
+	 * @param  pieceIndex index of this piece
+	 * @return            pieceSize, -1 if no such piece
+	 *                        (if index is beyond bounds of piece count)
+	 */
 	public int getPieceSize(int pieceIndex) {
 		int pieceSize;
 		if (pieceIndex == info.piece_hashes.length - 1)
 			pieceSize = size % info.piece_length;
-		else
+		else if (pieceIndex < info.piece_hashes.length)
 			pieceSize = info.piece_length;
+		else
+			pieceSize = -1;
 		return pieceSize;
 	}
 
@@ -153,6 +192,14 @@ public class TorrentHandler implements PeerDelegate {
 		return continueReading;
 	}
 
+	/**
+	 * will be called by peer after a handshake exchange has been
+	 * checked. Allows torrnent handler to know what peers have
+	 * successfully connected.
+	 * @param peer        the peer that has checked the handshakes
+	 * @param peerIsLegit true if the handshake was correct,
+	 *                    false if handshake was incorrect
+	 */
 	public void peerDidHandshake(Peer peer, Boolean peerIsLegit) {
 		if (peerIsLegit) {
 			peer.startReading();
@@ -162,10 +209,19 @@ public class TorrentHandler implements PeerDelegate {
 		}
 	}
 
+	/**
+	 * Called by peer if it tried to connect but failed for any reason
+	 * @param peer peer that failed to create a connection
+	 */
 	public void peerDidFailToConnect(Peer peer) {
 		System.err.println("Could not connect to peer " + peer.peer_id + " at ip: " + peer.ip);
 	}
 
+	/**
+	 * Start torrent handler. Which will communicate with the tracker
+	 * and parse through the tracker response to create a connection to
+	 * the peers that begin with "-RU".
+	 */
 	public void start() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
 		// ToolKit.print(decodedData);

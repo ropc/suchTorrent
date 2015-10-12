@@ -5,6 +5,10 @@ import java.nio.*;
 import java.util.*;
 import GivenTools.*;
 
+/**
+ * A container for the Handshake that allows for ease of use
+ * Use handshakeInstance.array to expose the bits to be sent.
+ */
 public class Handshake {
 	public final ByteBuffer info_hash;
 	public final String peer_id;
@@ -92,6 +96,12 @@ public class Handshake {
 		return handshake;
 	}
 
+	/**
+	 * creates a Handshake object out of a given
+	 * byte array containing a handshake
+	 * @param  handshake byte[] that contains handshake
+	 * @return           Handshake object
+	 */
 	public static Handshake decode(byte[] handshake) {
 		int protocol_length = (int)handshake[0];
 		String protocol_str = new String(Arrays.copyOfRange(handshake, 1, 1 + protocol_length));

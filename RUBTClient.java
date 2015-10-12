@@ -5,7 +5,13 @@ import java.net.*;
 import java.util.*;
 import GivenTools.*;
 
+
 public class RUBTClient {
+	/**
+	 * returns a randomly generated peer id to be used for
+	 * communication with peers/tracker
+	 * @return the peer id
+	 */
 	public static String generatePeerId() {
 		char[] chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".toCharArray();
 		Random rando = new Random();
@@ -30,6 +36,13 @@ public class RUBTClient {
 		return newSocket;
 	}
 
+	/**
+	 * main method for BitTorrent client.
+	 * creates a TorrentHandler object that will handle the download
+	 * for a given torrent.
+	 * @param args command line arguments
+	 *             these should be torrentFileName saveFileName
+	 */
 	public static void main(String[] args) {
 		TorrentHandler myTorrent = null;
 		if (args.length == 2) {
