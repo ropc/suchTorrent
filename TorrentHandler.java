@@ -23,7 +23,7 @@ public class TorrentHandler implements PeerDelegate {
 		try {
 			TorrentInfo newInfo = new TorrentInfo(Files.readAllBytes(Paths.get(torrentFilename)));
 			String newInfoHash = URLEncoder.encode(new String(newInfo.info_hash.array(), "ISO-8859-1"), "ISO-8859-1");
-			newTorrent = new TorrentHandler(newInfo, newInfoHash, SuchTorrent.generatePeerId(), saveFileName);
+			newTorrent = new TorrentHandler(newInfo, newInfoHash, RUBTClient.generatePeerId(), saveFileName);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.err.println("could not create torrent handler");
