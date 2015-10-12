@@ -19,9 +19,9 @@ public class Peer {
 	protected Boolean amInterested;
 
 	public static Peer peerFromMap(Map<ByteBuffer, Object> peerMap) {
-		String ip = new String(((ByteBuffer)peerMap.get(TorrentHandler.KEY_IP)).array());
-		String peer_id = new String(((ByteBuffer)peerMap.get(TorrentHandler.KEY_PEER_ID)).array());
-		int port = (int)peerMap.get(TorrentHandler.KEY_PORT);
+		String ip = new String(((ByteBuffer)peerMap.get(Tracker.KEY_IP)).array());
+		String peer_id = new String(((ByteBuffer)peerMap.get(Tracker.KEY_PEER_ID)).array());
+		int port = (int)peerMap.get(Tracker.KEY_PORT);
 		return new Peer(ip, peer_id, port);
 	}
 

@@ -15,16 +15,6 @@ public class TorrentHandler {
 	public int size;
 	public MessageData[] all_pieces;
 
-	public final static ByteBuffer KEY_COMPLETE = ByteBuffer.wrap(new byte[] { 'c', 'o', 'm', 'p', 'l', 'e', 't', 'e'});
-	public final static ByteBuffer KEY_DOWNLOADED = ByteBuffer.wrap(new byte[] { 'd', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 'e', 'd' });
-	public final static ByteBuffer KEY_INCOMPLETE = ByteBuffer.wrap(new byte[] { 'i', 'n', 'c', 'o', 'm', 'p', 'l', 'e', 't', 'e' });
-	public final static ByteBuffer KEY_INTERVAL = ByteBuffer.wrap(new byte[] { 'i', 'n', 't', 'e', 'r', 'v', 'a', 'l' });
-	public final static ByteBuffer KEY_MIN_INTERVAL = ByteBuffer.wrap(new byte[] { 'm', 'i', 'n', ' ', 'i', 'n', 't', 'e', 'r', 'v', 'a', 'l' });
-	public final static ByteBuffer KEY_PEERS = ByteBuffer.wrap(new byte[] { 'p', 'e', 'e', 'r', 's' });
-	public final static ByteBuffer KEY_IP = ByteBuffer.wrap(new byte[] { 'i', 'p' });
-	public final static ByteBuffer KEY_PEER_ID = ByteBuffer.wrap(new byte[] { 'p', 'e', 'e', 'r', ' ', 'i', 'd' });
-	public final static ByteBuffer KEY_PORT = ByteBuffer.wrap(new byte[] { 'p', 'o', 'r', 't' });
-
 
 	public static TorrentHandler buildTorrent(String filename) {
 		TorrentHandler newTorrent = null;
@@ -132,10 +122,10 @@ public class TorrentHandler {
 	public void start() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
 		ToolKit.print(decodedData);
-		ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)decodedData.get(TorrentHandler.KEY_PEERS);
+		ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)decodedData.get(Tracker.KEY_PEERS);
 		// ToolKit.print(peers);
 		for (Map<ByteBuffer, Object> map_peer : peers) {
-			ByteBuffer id = (ByteBuffer)map_peer.get(TorrentHandler.KEY_PEER_ID);
+			ByteBuffer id = (ByteBuffer)map_peer.get(Tracker.KEY_PEER_ID);
 			if (id != null) {
 				String new_peer_id = new String(id.array());
 				if (new_peer_id.substring(0, 3).compareTo("-RU") == 0)
