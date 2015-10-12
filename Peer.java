@@ -6,8 +6,7 @@ import GivenTools.*;
 
 /**
  * A peer that conforms to the BitTorrent protocol
- * This peer will provide an interface to a peer for the
- * TorrentHandler delegate. It will call methods on this delegate
+ * This peer will call methods on its PeerDelegate
  * to notify it when certain events have occurred, such as
  * a message has been received.
  */
@@ -15,7 +14,7 @@ public class Peer {
 	public final String ip;
 	public final String peer_id;
 	public final int port;
-	public TorrentHandler delegate;
+	public PeerDelegate delegate;
 	public Socket sock;
 	private DataInputStream input;
 	private DataOutputStream output;
@@ -25,14 +24,14 @@ public class Peer {
 	protected Boolean amChocking;
 	protected Boolean amInterested;
 
-	public static Peer peerFromMap(Map<ByteBuffer, Object> peerMap, TorrentHandler delegate) {
+	public static Peer peerFromMap(Map<ByteBuffer, Object> peerMap, PeerDelegate delegate) {
 		String ip = new String(((ByteBuffer)peerMap.get(Tracker.KEY_IP)).array());
 		String peer_id = new String(((ByteBuffer)peerMap.get(Tracker.KEY_PEER_ID)).array());
 		int port = (int)peerMap.get(Tracker.KEY_PORT);
 		return new Peer(ip, peer_id, port, delegate);
 	}
 
-	public Peer(String ip, String peer_id, int port, TorrentHandler delegate) {
+	public Peer(String ip, String peer_id, int port, PeerDelegate delegate) {
 		this.ip = ip;
 		this.peer_id = peer_id;
 		this.port = port;

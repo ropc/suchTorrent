@@ -5,7 +5,7 @@ import java.util.*;
 import java.security.*;
 import GivenTools.*;
 
-public class TorrentHandler {
+public class TorrentHandler implements PeerDelegate {
 	public final TorrentInfo info;
 	public Tracker tracker;
 	public final String escaped_info_hash;
