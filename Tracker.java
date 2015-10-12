@@ -11,7 +11,7 @@ public class Tracker{
 	private static String URL; //The url of the tracker
 	private int uploaded; // The amount that has been uploaded so far [since start message sent to tracker]
 	private int downloaded;// The amount that has been downloaded so far [since start message sent to tracker]
-	public enum MessageType{GET,STARTED,STOPPED,COMPLETED} //The type of message that can be sent to the tracker
+	public enum MessageType{UNDEFINED,STARTED,STOPPED,COMPLETED} //The type of message that can be sent to the tracker
 	public MessageType Event; //The type of message that is to be sent to the tracker
 
 	public final static ByteBuffer KEY_COMPLETE = ByteBuffer.wrap(new byte[] { 'c', 'o', 'm', 'p', 'l', 'e', 't', 'e'});
@@ -59,6 +59,10 @@ public class Tracker{
 	}
 	
 	public Map<ByteBuffer, Object> getTrackerResponse(int Cuploaded, int Cdownloaded){//Send a message to the tracker and wait on a response. Return the decoded response.
+		return getTrackerResponse(Cuploaded,Cdownloaded,MessageType.UNDEFINED);}
+	
+	public Map<ByteBuffer, Object> getTrackerResponse(int Cuploaded, int Cdownloaded, MessageType M){//Send a message to the tracker and wait on a response. Return the decoded response.
+		Event=M;
 		uploaded = Cuploaded;		
 		downloaded = Cdownloaded;		//Update the uploaded and downloaded amounts
 		Map<ByteBuffer, Object> retval;	//The Map that will be returned at the end of the method.
@@ -76,8 +80,15 @@ public class Tracker{
 			try{connection.connect();}
 			catch(Exception e){flag = false;}
 			}
-		if(connection==null){return null;}
 		
+		if(connection==null){return null;}//If there was no connection
+		try{	
+		if(flag==false&&connection.getResponseCode()!=200){
+			System.err.print("Connection Returned Error:"+connection.getResponseMessage());
+		}
+		}catch(Exception e ){
+			System.err.print("Bad connection!");
+				    }
 		byte[] content = new byte[connection.getContentLength()];
 		try {
 			connection.getInputStream().read(content);	//read in the message sent by the tracker
@@ -115,6 +126,6 @@ public class Tracker{
 			}
 		if(connection==null){return;}
 		
-		}	
+		}
 		
 }
