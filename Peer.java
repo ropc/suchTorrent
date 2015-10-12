@@ -255,6 +255,8 @@ public class Peer {
 	 * getters/setters for choking/interested
 	 * some are protected as they should only be changed beacause
 	 * of incoming messages, which are processed by this class
+	 * These can be modified in the future to allow for more functionality
+	 * such as notifying delegate that this peer is no longer chocking
 	 */
 
 	public Boolean getIsChocking() {
