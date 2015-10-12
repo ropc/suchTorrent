@@ -64,9 +64,13 @@ public class Tracker{
 		Map<ByteBuffer, Object> retval;	
 		HttpURLConnection connection = TalkToTracker(6881) ;
 		int i=6881;
-		while(++i<=6889&&connection==null){//try connection until you either get a connection or run out of valid ports to try on
+		boolean flag=false;
+		while(++i<=6889&&(connection==null||!flag)){//try connection until you either get a connection or run out of valid ports to try on
 			connection = TalkToTracker(i);
-		}
+			flag=true;
+			try{connection.connect();}
+			catch(Exception e){flag = false;}
+			}
 		if(connection==null){return null;}
 		
 		byte[] content = new byte[connection.getContentLength()];
@@ -82,5 +86,22 @@ public class Tracker{
 		}
 		
 	}
+	
+	public void StopCall(int Cuploaded, int Cdownloaded){
+		int i=6881;
+		uploaded = Cuploaded;
+		downloaded = Cdownloaded;
+		Event=MessageType.STOPPED;	
+		HttpURLConnection connection = TalkToTracker(i);
+		boolean flag=false;
+		while(++i<=6889&&(connection==null||!flag)){//try connection until you either get a connection or run out of valid ports to try on
+			connection = TalkToTracker(i);
+			flag=true;
+			try{connection.connect();}
+			catch(Exception e){flag=false;}
+			}
+		if(connection==null){return;}
 		
-	}
+		}
+		
+}
