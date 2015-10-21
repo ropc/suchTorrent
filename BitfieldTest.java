@@ -6,9 +6,14 @@ public class BitfieldTest {
 		myBitfield.print();
 		otherBitfield.print();
 
+		myBitfield.set(2);
+
 		myBitfield.And(otherBitfield).print();
 		myBitfield.Or(otherBitfield).print();
 		myBitfield.Xor(otherBitfield).print();
-		myBitfield.Not().print();
+		Bitfield notMyBitfield = myBitfield.Not();
+		notMyBitfield.print();
+		notMyBitfield.unset(4);
+		notMyBitfield.print();
 	}
 }

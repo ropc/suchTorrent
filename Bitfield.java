@@ -2,7 +2,7 @@
  * Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
  */
 public class Bitfield {
-	private	 byte[] array;
+	private byte[] array;
 	public final int length;
 
 	public Bitfield(int numBits) {
@@ -28,6 +28,25 @@ public class Bitfield {
 	private Bitfield(byte[] array, int numBits) {
 		this.array = array;
 		length = numBits;
+	}
+
+	public void set(int bit) {
+		set(bit, true);
+	}
+
+	public void unset(int bit) {
+		set(bit, false);
+	}
+
+	public void set(int bit, Boolean value) {
+		if (bit < length) {
+			int wantedByte = bit / 8;
+			byte mask = (byte)(1 << (7 - bit % 8));
+			if (value == true)
+				array[wantedByte] = (byte)(array[wantedByte] | mask);
+			else
+				array[wantedByte] = (byte)(array[wantedByte] & (byte)(~mask));
+		}
 	}
 
 	/**
