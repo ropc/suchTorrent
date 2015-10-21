@@ -2,8 +2,8 @@
  * Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
  */
 public class Bitfield {
-	private byte[] array;
-	public int length;
+	private	 byte[] array;
+	public final int length;
 
 	public Bitfield(int numBits) {
 		if (numBits > 0) {
@@ -17,6 +17,7 @@ public class Bitfield {
 			array = null;
 		}
 		length = numBits;
+		// System.out.println("Created bitfield wtih " + length + " bits.");
 	}
 
 	/**
@@ -29,7 +30,28 @@ public class Bitfield {
 		length = numBits;
 	}
 
-	public static decode(byte[] array, int numBits) {
+	/**
+	 * Mostly for debugging, will print the bits in one line.
+	 */
+	public void print() {
+		System.out.print("Length: " + length + " Bits: ");
+		int numBytes = length / 8;
+		if (length % 8 > 0)
+			numBytes++;
+
+		for (int i = 0; i < numBytes; i++) {
+			for (int j = 7; j >= 0; j--) {
+				if (((array[i] >> j) & 1) == 1)
+					System.out.print("1");
+				else
+					System.out.print("0");
+			}
+			System.out.print(" ");
+		}
+		System.out.println();
+	}
+
+	public static Bitfield decode(byte[] array, int numBits) {
 		int numBytes = numBits / 8;
 		if (numBits % 8 > 0)
 			numBytes++;
@@ -43,18 +65,44 @@ public class Bitfield {
 		}
 	}
 
-	public static byte And(byte a, byte b) {
-		return a & b;
+	public Bitfield And(Bitfield otherBitfield) {
+		return BitfieldAND(this, otherBitfield);
 	}
 
 	public static Bitfield BitfieldAND(Bitfield b1, Bitfield b2) {
+		return BitfieldOperation(b1, b2, new AND());
+	}
+
+	public static Bitfield BitfieldOperation(Bitfield b1, Bitfield b2, BitwiseFunction func) {
 		Bitfield resultBitfield = null;
 		if (b1.length == b2.length) {
 			resultBitfield = new Bitfield(b1.length);
 			for (int i = 0; i < b1.length; i++) {
-				resultBitfield.array[i] = b1.array[i] & b2.array[i];
+				resultBitfield.array[i] = func.execute(b1.array[i], b2.array[i]);
 			}
 		}
 		return resultBitfield;
+	}
+
+	public interface BitwiseFunction {
+		public byte execute(byte a, byte b);
+	}
+
+	public static final class AND implements BitwiseFunction {
+		public byte execute(byte a, byte b) {
+			return (byte)(a & b);
+		}
+	}
+
+	public static final class OR implements BitwiseFunction {
+		public byte execute(byte a, byte b) {
+			return (byte)(a | b);
+		}
+	}
+
+	public static final class XOR implements BitwiseFunction {
+		public byte execute(byte a, byte b) {
+			return (byte)(a ^ b);
+		}
 	}
 }
