@@ -34,7 +34,7 @@ public class Bitfield {
 	 * Mostly for debugging, will print the bits in one line.
 	 */
 	public void print() {
-		System.out.print("Length: " + length + " Bits: ");
+		System.out.print("Length: " + length + "  Bits: ");
 		int numBytes = length / 8;
 		if (length % 8 > 0)
 			numBytes++;
@@ -69,15 +69,44 @@ public class Bitfield {
 		return BitfieldAND(this, otherBitfield);
 	}
 
+	public Bitfield Or(Bitfield otherBitfield) {
+		return BitfieldOR(this, otherBitfield);
+	}
+
+	public Bitfield Xor(Bitfield otherBitfield) {
+		return BitfieldXOR(this, otherBitfield);
+	}
+
+	public Bitfield Not() {
+		return BitfieldNOT(this);
+	}
+
 	public static Bitfield BitfieldAND(Bitfield b1, Bitfield b2) {
 		return BitfieldOperation(b1, b2, new AND());
+	}
+
+	public static Bitfield BitfieldOR(Bitfield b1, Bitfield b2) {
+		return BitfieldOperation(b1, b2, new OR());
+	}
+
+	public static Bitfield BitfieldXOR(Bitfield b1, Bitfield b2) {
+		return BitfieldOperation(b1, b2, new XOR());
+	}
+
+	public static Bitfield BitfieldNOT(Bitfield b) {
+		return BitfieldOperation(b, b, new NOT());
 	}
 
 	public static Bitfield BitfieldOperation(Bitfield b1, Bitfield b2, BitwiseFunction func) {
 		Bitfield resultBitfield = null;
 		if (b1.length == b2.length) {
 			resultBitfield = new Bitfield(b1.length);
-			for (int i = 0; i < b1.length; i++) {
+			
+			int numBytes = b1.length / 8;
+			if (b1.length % 8 > 0)
+				numBytes++;
+
+			for (int i = 0; i < numBytes; i++) {
 				resultBitfield.array[i] = func.execute(b1.array[i], b2.array[i]);
 			}
 		}
@@ -103,6 +132,15 @@ public class Bitfield {
 	public static final class XOR implements BitwiseFunction {
 		public byte execute(byte a, byte b) {
 			return (byte)(a ^ b);
+		}
+	}
+
+	/**
+	 * Maybe a bit stupid, but thats why its protected
+	 */
+	protected static final class NOT implements BitwiseFunction {
+		public byte execute(byte a, byte b) {
+			return (byte)(~a);
 		}
 	}
 }
