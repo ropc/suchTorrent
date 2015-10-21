@@ -97,7 +97,7 @@ public class Bitfield {
 		return BitfieldOperation(b, b, new NOT());
 	}
 
-	public static Bitfield BitfieldOperation(Bitfield b1, Bitfield b2, BitwiseFunction func) {
+	protected static Bitfield BitfieldOperation(Bitfield b1, Bitfield b2, BitwiseFunction func) {
 		Bitfield resultBitfield = null;
 		if (b1.length == b2.length) {
 			resultBitfield = new Bitfield(b1.length);
@@ -113,30 +113,31 @@ public class Bitfield {
 		return resultBitfield;
 	}
 
-	public interface BitwiseFunction {
+	protected interface BitwiseFunction {
 		public byte execute(byte a, byte b);
 	}
 
-	public static final class AND implements BitwiseFunction {
+	protected static final class AND implements BitwiseFunction {
 		public byte execute(byte a, byte b) {
 			return (byte)(a & b);
 		}
 	}
 
-	public static final class OR implements BitwiseFunction {
+	protected static final class OR implements BitwiseFunction {
 		public byte execute(byte a, byte b) {
 			return (byte)(a | b);
 		}
 	}
 
-	public static final class XOR implements BitwiseFunction {
+	protected static final class XOR implements BitwiseFunction {
 		public byte execute(byte a, byte b) {
 			return (byte)(a ^ b);
 		}
 	}
 
 	/**
-	 * Maybe a bit stupid, but thats why its protected
+	 * Ignores whatever the second argument is.
+	 * Only like this so that it implements the same interface.
 	 */
 	protected static final class NOT implements BitwiseFunction {
 		public byte execute(byte a, byte b) {
