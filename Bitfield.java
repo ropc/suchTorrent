@@ -2,9 +2,22 @@
  * Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
  */
 public class Bitfield {
-	private byte[] array;
+	/**
+	 * The whole array is treated as one big-endianed sequence
+	 * of bits where the highest bit corresponds to bit 0.
+	 */
+	public byte[] array;
 	public final int length;
 
+	protected static final BitwiseFunction AND = new And();
+	protected static final BitwiseFunction OR = new Or();
+	protected static final BitwiseFunction XOR = new Xor();
+	protected static final BitwiseFunction NOT = new Not();
+
+	/**
+	 * Creates a new Bitfiled of length numBits (with all 0's)
+	 * @param  numBits the number of bits that this bitfield will hold
+	 */
 	public Bitfield(int numBits) {
 		if (numBits > 0) {
 			int numBytes = numBits / 8;
@@ -17,7 +30,6 @@ public class Bitfield {
 			array = null;
 		}
 		length = numBits;
-		// System.out.println("Created bitfield wtih " + length + " bits.");
 	}
 
 	/**
@@ -25,20 +37,36 @@ public class Bitfield {
 	 * @param  array   initialized byte array describing the bitfield
 	 * @param  numBits number of bits useful in array
 	 */
-	private Bitfield(byte[] array, int numBits) {
+	protected Bitfield(byte[] array, int numBits) {
 		this.array = array;
 		length = numBits;
 	}
 
-	public void set(int bit) {
-		set(bit, true);
+	/**
+	 * sets the given bit to 1.
+	 * @param bitNum the position of the bit to be flipped on
+	 */
+	public void set(int bitNum) {
+		setValue(bitNum, true);
 	}
 
-	public void unset(int bit) {
-		set(bit, false);
+	/**
+	 * sets the given bit to 0.
+	 * @param bitNum the position of the bit to be switched off
+	 */
+	public void unset(int bitNum) {
+		setValue(bitNum, false);
 	}
 
-	public void set(int bit, Boolean value) {
+	/**
+	 * Sets the given bit to 1 if value is true, 0 if
+	 * value is false. Will only make the change if the bit
+	 * lies within the allowed range.
+	 * @param bit   bit to be changed
+	 * @param value true if bit should be set to 1,
+	 *              	false if it should be set to 0
+	 */
+	protected void setValue(int bit, Boolean value) {
 		if (bit < length) {
 			int wantedByte = bit / 8;
 			byte mask = (byte)(1 << (7 - bit % 8));
@@ -70,6 +98,13 @@ public class Bitfield {
 		System.out.println();
 	}
 
+	/**
+	 * creates a new Bitfield out of a given array and the number
+	 * of bits that the bitfield will look at
+	 * @param  array   the bitfield array
+	 * @param  numBits the number of bits relevant in the bitfield
+	 * @return         a Bitfield corresponding to the given array
+	 */
 	public static Bitfield decode(byte[] array, int numBits) {
 		int numBytes = numBits / 8;
 		if (numBits % 8 > 0)
@@ -84,38 +119,76 @@ public class Bitfield {
 		}
 	}
 
+	/**
+	 * Will perform a bitwise AND with this Bitfield
+	 * and the given bitfield
+	 * @param  otherBitfield the bitfield to AND with
+	 * @return               the AND result as a Bitfield
+	 */
 	public Bitfield And(Bitfield otherBitfield) {
 		return BitfieldAND(this, otherBitfield);
 	}
 
+	/**
+	 * Will perform a bitwise OR with this Bitfield
+	 * and the given bitfield
+	 * @param  otherBitfield the bitfield to OR with
+	 * @return               the OR result as a Bitfield
+	 */
 	public Bitfield Or(Bitfield otherBitfield) {
 		return BitfieldOR(this, otherBitfield);
 	}
 
+	/**
+	 * Will perform a bitwise XOR with this Bitfield
+	 * and the given bitfield
+	 * @param  otherBitfield the bitfield to XOR with
+	 * @return               the XOR result as a Bitfield
+	 */
 	public Bitfield Xor(Bitfield otherBitfield) {
 		return BitfieldXOR(this, otherBitfield);
 	}
 
+	/**
+	 * Will perform a bitwise NOT with this Bitfield
+	 * @return the NOT result as a Bitfield
+	 */
 	public Bitfield Not() {
 		return BitfieldNOT(this);
 	}
 
+	/**
+	 * The next 4 static methods just allow for AND,
+	 * NOT, OR, and XOR to be used as class methods.
+	 * They all take in at least 1 bitfield and return a
+	 * new Bitfield representing the result of the operation.
+	 */
+
 	public static Bitfield BitfieldAND(Bitfield b1, Bitfield b2) {
-		return BitfieldOperation(b1, b2, new AND());
+		return BitfieldOperation(b1, b2, AND);
 	}
 
 	public static Bitfield BitfieldOR(Bitfield b1, Bitfield b2) {
-		return BitfieldOperation(b1, b2, new OR());
+		return BitfieldOperation(b1, b2, OR);
 	}
 
 	public static Bitfield BitfieldXOR(Bitfield b1, Bitfield b2) {
-		return BitfieldOperation(b1, b2, new XOR());
+		return BitfieldOperation(b1, b2, XOR);
 	}
 
 	public static Bitfield BitfieldNOT(Bitfield b) {
-		return BitfieldOperation(b, b, new NOT());
+		return BitfieldOperation(b, b, NOT);
 	}
 
+	/**
+	 * Takes in two bitfields and will execute the given
+	 * BitwiseFunction on each byte of the two bitfields.
+	 * b1 and b2 must be the same length, otherwise will return null
+	 * @param  b1   A bitfield that will be used for computing the result
+	 * @param  b2   Another bitfield that will be used for computing the result
+	 * @param  func the BitwiseFunction to be executed on each byte
+	 * @return      the result as a Bitfield
+	 */
 	protected static Bitfield BitfieldOperation(Bitfield b1, Bitfield b2, BitwiseFunction func) {
 		Bitfield resultBitfield = null;
 		if (b1.length == b2.length) {
@@ -132,33 +205,58 @@ public class Bitfield {
 		return resultBitfield;
 	}
 
+	/**
+	 * It provides assurance that an execute(byte, byte)
+	 * will be implemented by any class that implements
+	 * this interface.
+	 * Serves as a command interface following
+	 * the command pattern in OOP.
+	 */
 	protected interface BitwiseFunction {
+		/**
+		 * Executes some function that takes in two
+		 * bytes and returns a byte
+		 * @param  a first byte passed
+		 * @param  b sencond byte passed
+		 * @return   resulting byte
+		 */
 		public byte execute(byte a, byte b);
 	}
 
-	protected static final class AND implements BitwiseFunction {
+	/**
+	 * The next four classes just will serve to implement
+	 * the BitwiseFunctions that can be used.
+	 * Kept private as these should only be used from their
+	 * corresponding instanciated constants
+	 * (Bitfield.AND, Bitfield.OR, Bitfield.XOR, Bitfield.NOT)
+	 */
+	
+	private static final class And implements BitwiseFunction {
 		public byte execute(byte a, byte b) {
 			return (byte)(a & b);
 		}
 	}
 
-	protected static final class OR implements BitwiseFunction {
+	private static final class Or implements BitwiseFunction {
 		public byte execute(byte a, byte b) {
 			return (byte)(a | b);
 		}
 	}
 
-	protected static final class XOR implements BitwiseFunction {
+	private static final class Xor implements BitwiseFunction {
 		public byte execute(byte a, byte b) {
 			return (byte)(a ^ b);
 		}
 	}
 
-	/**
-	 * Ignores whatever the second argument is.
-	 * Only like this so that it implements the same interface.
-	 */
-	protected static final class NOT implements BitwiseFunction {
+	private static final class Not implements BitwiseFunction {
+		/**
+		 * Ignores whatever the second argument is.
+		 * Only like this so that it implements the same interface.
+		 * @param  a byte to be complemented
+		 * @param  b ignored, only here to implement BitwiseFunction
+		 * @return   the resulting byte
+		 */
 		public byte execute(byte a, byte b) {
 			return (byte)(~a);
 		}

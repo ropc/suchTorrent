@@ -3,8 +3,8 @@ public class BitfieldTest {
 		// a couple new 16 bit bitfields
 		Bitfield myBitfield = new Bitfield(16);
 		Bitfield otherBitfield = new Bitfield(16);
-		myBitfield.print();
-		otherBitfield.print();
+		// myBitfield.print();
+		// otherBitfield.print();
 
 		myBitfield.set(2);
 
@@ -15,5 +15,9 @@ public class BitfieldTest {
 		notMyBitfield.print();
 		notMyBitfield.unset(4);
 		notMyBitfield.print();
+		// myBitfield.print();
+		// byte[] suchArray = myBitfield.getArray();
+		// suchArray[0] = -8;
+		// myBitfield.print();
 	}
 }
