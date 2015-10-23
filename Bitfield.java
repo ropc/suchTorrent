@@ -7,7 +7,7 @@ public class Bitfield {
 	 * of bits where the highest bit corresponds to bit 0.
 	 */
 	public byte[] array;
-	public final int length;
+	public final int numBits;
 
 	protected static final BitwiseFunction AND = new And();
 	protected static final BitwiseFunction OR = new Or();
@@ -15,7 +15,7 @@ public class Bitfield {
 	protected static final BitwiseFunction NOT = new Not();
 
 	/**
-	 * Creates a new Bitfiled of length numBits (with all 0's)
+	 * Creates a new Bitfiled of numBits numBits (with all 0's)
 	 * @param  numBits the number of bits that this bitfield will hold
 	 */
 	public Bitfield(int numBits) {
@@ -29,7 +29,7 @@ public class Bitfield {
 		} else {
 			array = null;
 		}
-		length = numBits;
+		this.numBits = numBits;
 	}
 
 	/**
@@ -39,7 +39,7 @@ public class Bitfield {
 	 */
 	protected Bitfield(byte[] array, int numBits) {
 		this.array = array;
-		length = numBits;
+		this.numBits = numBits;
 	}
 
 	/**
@@ -67,7 +67,7 @@ public class Bitfield {
 	 *              	false if it should be set to 0
 	 */
 	protected void setValue(int bit, Boolean value) {
-		if (bit < length) {
+		if (bit < numBits) {
 			int wantedByte = bit / 8;
 			byte mask = (byte)(1 << (7 - bit % 8));
 			if (value == true)
@@ -81,12 +81,8 @@ public class Bitfield {
 	 * Mostly for debugging, will print the bits in one line.
 	 */
 	public void print() {
-		System.out.print("Length: " + length + "  Bits: ");
-		int numBytes = length / 8;
-		if (length % 8 > 0)
-			numBytes++;
-
-		for (int i = 0; i < numBytes; i++) {
+		System.out.print("Length: " + numBits + "  Bits: ");
+		for (int i = 0; i < array.length; i++) {
 			for (int j = 7; j >= 0; j--) {
 				if (((array[i] >> j) & 1) == 1)
 					System.out.print("1");
@@ -110,7 +106,7 @@ public class Bitfield {
 		if (numBits % 8 > 0)
 			numBytes++;
 
-		// if the given array is the right length, return a Bitfield
+		// if the given array is the right numBits, return a Bitfield
 		// with describing this array
 		if (numBits > 0 && array.length == numBytes) {
 			return new Bitfield(array, numBits);
@@ -191,14 +187,10 @@ public class Bitfield {
 	 */
 	protected static Bitfield BitfieldOperation(Bitfield b1, Bitfield b2, BitwiseFunction func) {
 		Bitfield resultBitfield = null;
-		if (b1.length == b2.length) {
-			resultBitfield = new Bitfield(b1.length);
-			
-			int numBytes = b1.length / 8;
-			if (b1.length % 8 > 0)
-				numBytes++;
+		if (b1.numBits == b2.numBits) {
+			resultBitfield = new Bitfield(b1.numBits);
 
-			for (int i = 0; i < numBytes; i++) {
+			for (int i = 0; i < b1.array.length; i++) {
 				resultBitfield.array[i] = func.execute(b1.array[i], b2.array[i]);
 			}
 		}
