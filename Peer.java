@@ -5,6 +5,7 @@ import java.net.*;
 import java.io.*;
 import java.nio.*;
 import java.util.*;
+import java.util.concurrent.*;
 import GivenTools.*;
 
 /**
@@ -26,6 +27,8 @@ public class Peer {
 	protected Boolean isInterested;
 	protected Boolean amChocking;
 	protected Boolean amInterested;
+
+	public BlockingQueue<MessageData> writeQueue;
 
 	/**
 	 * create a Peer from a given HashMap that was decoded
@@ -58,6 +61,7 @@ public class Peer {
 		amChocking = true;
 		amInterested = false;
 		bitfield = null;
+		writeQueue = new LinkedBlockingQueue<MessageData>();
 	}
 
 	/**
@@ -292,5 +296,33 @@ public class Peer {
 
 	public void setAmInterested(Boolean value) {
 		amChocking = value;
+	}
+
+	protected static class StartReadThread implements Runnable {
+		Peer peer;
+		protected StartReadThread(Peer peer) {
+			this.peer = peer;
+		}
+
+		protected void run() {
+			peer.start();
+		}
+	}
+
+	protected static class OutputThread implements Runnable {
+		Peer peer;
+		protected OutputThread(Peer peer) {
+			this.peer = peer;
+		}
+
+		protected void run() {
+			try {
+				while ((MessageData msg = peer.writeQueue.take()) != null) {
+					peer.send(msg);
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }

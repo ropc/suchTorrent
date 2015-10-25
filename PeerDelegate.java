@@ -31,4 +31,8 @@ public interface PeerDelegate {
 	 * @param peer peer that failed to connect
 	 */
 	public void peerDidFailToConnect(Peer peer);
+
+	public String getLocalPeerId();
+
+	public TorrentInfo getTorrentInfo();
 }

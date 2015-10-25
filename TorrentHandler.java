@@ -15,10 +15,10 @@ import GivenTools.*;
  * torrent data for a given torrent.
  */
 public class TorrentHandler implements PeerDelegate {
-	public final TorrentInfo info;
+	protected final TorrentInfo info;
 	public Tracker tracker;
 	public final String escaped_info_hash;
-	public String local_peer_id;
+	protected String local_peer_id;
 	public int uploaded;
 	public int downloaded;
 	public int size;
