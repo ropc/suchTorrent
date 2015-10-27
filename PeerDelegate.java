@@ -1,7 +1,7 @@
 /**
  * Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
  */
-
+import GivenTools.*;
 /**
  * An interface for a Peer to pass events to a handler.
  */
@@ -23,7 +23,7 @@ public interface PeerDelegate {
 	 * @return         true if peer should continue listening,
 	 *                      false if peer should stop listening.
 	 */
-	public Boolean peerDidReceiveMessage(Peer peer, MessageData message);
+	public void peerDidReceiveMessage(Peer peer, MessageData message);
 
 	/**
 	 * Called by a Peer if a socket could not be created to the

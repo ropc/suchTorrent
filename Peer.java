@@ -22,13 +22,15 @@ public class Peer {
 	public Socket sock;
 	private DataInputStream input;
 	private DataOutputStream output;
-	public byte[] bitfield;
+	public Bitfield bitfield;
 	protected Boolean isChocking;
 	protected Boolean isInterested;
 	protected Boolean amChocking;
 	protected Boolean amInterested;
 
-	public BlockingQueue<MessageData> writeQueue;
+	public BlockingQueue<PeerEvent> writeQueue;
+	public PeerDelegate readThread;
+	public PeerDelegate writeThread;
 
 	/**
 	 * create a Peer from a given HashMap that was decoded
@@ -61,7 +63,7 @@ public class Peer {
 		amChocking = true;
 		amInterested = false;
 		bitfield = null;
-		writeQueue = new LinkedBlockingQueue<MessageData>();
+		writeQueue = new LinkedBlockingQueue<>();
 	}
 
 	/**
@@ -138,11 +140,15 @@ public class Peer {
 	 * @param  message     message to send
 	 * @throws IOException if any errors occur, they will be thrown
 	 */
-	public void send(MessageData message) throws IOException {
+	public void writeToSocket(MessageData message) throws IOException {
 		if (output != null && message != null && message.message != null) {
 			output.write(message.message);
 			output.flush();
 		}
+	}
+
+	protected void send(MessageData message) {
+		writeQueue.put(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_TO_SEND, message));
 	}
 
 	/**
@@ -151,7 +157,7 @@ public class Peer {
 	 * delegate.peerDidReceiveMessage() returns true or the socket
 	 * is closed
 	 */
-	public void startReading() {
+	protected void startReading() {
 		Boolean isReading = true;
 		while (isReading) {
 			try {
@@ -183,7 +189,7 @@ public class Peer {
 				System.out.println("message " + message.type.toString() + " came in");
 				switch (message.type) {
 					case BITFIELD:
-						bitfield = message.bitfield;
+						bitfield = Bitfield.decode(message.bitfield);
 						break;
 					case UNCHOKE:
 						setIsChocking(false);
@@ -214,23 +220,23 @@ public class Peer {
 	 * @param info          torrentInfo
 	 * @param local_peer_id peer id for the local client (used to create the local handshake)
 	 */
-	public void start(TorrentInfo info, String local_peer_id) {
+	protected void start() {
 		if (sock == null) {
 			connect();
 		}
-		handshake(info, local_peer_id);
+		handshake();
 	}
 
 	/**
 	 * will initiate the handshaking process by sending the local
 	 * handshake to the peer. also checks if the returning handshake is
-	 * correct. calls delegate to decide what to do next
+	 * correct. calls delegate to decide what to handshakedo next
 	 * @param info          info stored in the torrent file
 	 * @param local_peer_id local peer id used for creating the local handshake
 	 */
-	protected void handshake(TorrentInfo info, String local_peer_id) {
+	protected void handshake() {
 		if (sock != null) {
-			Handshake localHandshake = new Handshake(info, local_peer_id);
+			Handshake localHandshake = new Handshake(delegate.getTorrentInfo(), delegate.getLocalPeerId());
 			try {
 				output.write(localHandshake.array);
 				output.flush();
@@ -252,6 +258,8 @@ public class Peer {
 					peerIsLegit = false;
 				}
 				delegate.peerDidHandshake(this, peerIsLegit);
+				if (readThread != null)
+					readThread.peerDidHandshake(this, event);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -298,8 +306,14 @@ public class Peer {
 		amChocking = value;
 	}
 
-	protected static class StartReadThread implements Runnable {
-		Peer peer;
+	public void startThreads() {
+		StartReadTread newReadThread = new StartReadThread(this);
+		this.readThread = newReadThread;
+		newReadThread.start();
+	}
+
+	protected static class StartReadThread implements Runnable, PeerDelegate {
+		final Peer peer;
 		protected StartReadThread(Peer peer) {
 			this.peer = peer;
 		}
@@ -307,22 +321,54 @@ public class Peer {
 		protected void run() {
 			peer.start();
 		}
+		
+		protected void peerDidHandshake(Peer peer, Boolean peerIsLegit) {
+			if (peer == this.peer && peerIsLegit == true) {
+				WriteThread newWriteThread = new WriteThread(this.peer);
+				this.peer.writeThread = newWriteThread;
+				newWriteThread.start();
+				this.peer.startReading();
+			}
+		}
+
+		public void peerDidReceiveMessage(Peer peer, MessageData message) {}
+		public void peerDidFailToConnect(Peer peer) {}
+		public String getLocalPeerId() {
+			return null;
+		}
+		public TorrentInfo getTorrentInfo() {
+			return null;
+		}
 	}
 
-	protected static class OutputThread implements Runnable {
-		Peer peer;
-		protected OutputThread(Peer peer) {
+	protected static class WriteThread implements Runnable, PeerDelegate {
+		final Peer peer;
+		protected WriteThread(Peer peer) {
 			this.peer = peer;
 		}
 
 		protected void run() {
 			try {
-				while ((MessageData msg = peer.writeQueue.take()) != null) {
-					peer.send(msg);
+				PeerEvent<?> event = null;
+				while ((event = peer.writeQueue.take()) != null) {
+					if (event.type == PeerEvent.Type.MESSAGE_TO_SEND) {
+						PeerEvent<MessageData> msgEvent = event;
+						peer.writeToSocket(msgEvent.payload);
+					}
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
+		}
+
+		public void peerDidHandshake(Peer peer, Boolean peerIsLegit) {}
+		public void peerDidReceiveMessage(Peer peer, MessageData message) {}
+		public void peerDidFailToConnect(Peer peer) {}
+		public String getLocalPeerId() {
+			return null;
+		}
+		public TorrentInfo getTorrentInfo() {
+			return null;
 		}
 	}
 }

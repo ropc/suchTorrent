@@ -4,7 +4,7 @@
 import java.nio.*; 
 import java.util.*;
 
-class MessageData{
+class MessageData implements EventPayload {
 	public final byte[] message;
 	public Message type;
 
