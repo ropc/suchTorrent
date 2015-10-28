@@ -162,10 +162,12 @@ public class TorrentHandler implements PeerDelegate {
 			MessageData requestMsg = new MessageData(Message.HAVE, message.pieceIndex);
 			sender.send(requestMsg);
 			System.out.println("sending HAVE piece " + message.pieceIndex + " to peer " + sender.ip);
-			all_pieces[message.pieceIndex] = message;
+			if (all_pieces[message.pieceIndex] != null) {
+				all_pieces[message.pieceIndex] = message;
+				saveTofile(message);
+				downloaded += getPieceSize(message.pieceIndex);
+			}
 			// nextPiece = message.pieceIndex + 1;
-			saveTofile(message);
-			downloaded += getPieceSize(message.pieceIndex);
 			// addDownloaded(getPieceSize(message.pieceIndex));
 			// System.out.println("downloaded: " + downloaded + " picece size: " + getPieceSize(message.pieceIndex));
 		} else {
@@ -184,9 +186,9 @@ public class TorrentHandler implements PeerDelegate {
 				System.out.println("sending INTERESTED");
 				peer.send(requestMsg);
 			} else if (message.type == Message.UNCHOKE) {
-				MessageData requestMsg = new MessageData(Message.REQUEST, 0, 0, info.piece_length);
-				System.out.println("sending request for piece 0 to " + peer.ip);
-				peer.send(requestMsg);
+				// MessageData requestMsg = new MessageData(Message.REQUEST, 0, 0, info.piece_length);
+				// System.out.println("sending request for piece 0 to " + peer.ip);
+				// peer.send(requestMsg);
 				System.out.println("notifying tracker will start to download");
 				tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STARTED);
 			} else if (message.type == Message.PIECE) {
@@ -207,6 +209,7 @@ public class TorrentHandler implements PeerDelegate {
 				System.out.println("done downloading. notifying tracker.");
 				tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
 				System.out.println("disconnecting from peer: " + peer.ip);
+				// should send them an event instead
 				peer.disconnect();
 				// saveTofile();
 			}
