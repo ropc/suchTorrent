@@ -142,12 +142,16 @@ public class TorrentHandler implements PeerDelegate {
 	 * @return         true if peer should continue reading, false if not
 	 */
 	public void peerDidReceiveMessage(Peer peer, MessageData message) {
-		eventQueue.put(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_RECEIVED, peer, message));
+		try {
+			eventQueue.put(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_RECEIVED, peer, message));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
-	protected void processMessageEvent(PeerEvent<MessageData> messageEvent) {
-		Peer peer = messageEvent.sender;
-		MessageData message = messageEvent.payload;
+	protected void processMessageEvent(Peer peer, MessageData message) {
+		// Peer peer = messageEvent.sender;
+		// MessageData message = messageEvent.payload;
 		try {
 			MessageData requestMsg = null;
 			String outputString = "";
@@ -218,7 +222,11 @@ public class TorrentHandler implements PeerDelegate {
 		} else {
 			eventType = PeerEvent.Type.HANDSHAKE_FAILED;
 		}
-		eventQueue.put(new PeerEvent<EventPayload>(eventType, peer));
+		try {
+			eventQueue.put(new PeerEvent<EventPayload>(eventType, peer));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -226,7 +234,11 @@ public class TorrentHandler implements PeerDelegate {
 	 * @param peer peer that failed to create a connection
 	 */
 	public void peerDidFailToConnect(Peer peer) {
-		eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.CONNECTION_FAILED, peer));
+		try {
+			eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.CONNECTION_FAILED, peer));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	public String getLocalPeerId() {
@@ -240,23 +252,23 @@ public class TorrentHandler implements PeerDelegate {
 
 	protected void consumeEvents() {
 		PeerEvent<? extends EventPayload> event = null;
-		while((event = eventQueue.take()) != null) {
-			if (event.type == PeerEvent.Type.CONNECTION_FAILED) {
-				System.err.println("Could not connect to peer " + event.sender.peer_id + " at ip: " + event.sender.ip);
-				// can ask user what to do here
-			} else if (event.type == PeerEvent.Type.MESSAGE_RECEIVED) {
-				consumeMessage(event);
-			} else if (event.type == PeerEvent.Type.HANDSHAKE_SUCCESSFUL) {
-				connectedPeers.add(event.sender);
-			} else if (event.type == PeerEvent.Type.HANDSHAKE_FAILED) {
-				System.err.println("handshake with peer " + event.sender.peer_id + " failed.");
-				event.sender.disconnect();
+		try {
+			while((event = eventQueue.take()) != null) {
+				if (event.type == PeerEvent.Type.CONNECTION_FAILED) {
+					System.err.println("Could not connect to peer " + event.sender.peer_id + " at ip: " + event.sender.ip);
+					// can ask user what to do here
+				} else if (event.type == PeerEvent.Type.MESSAGE_RECEIVED && event.payload instanceof MessageData) {
+					processMessageEvent(event.sender, (MessageData)event.payload);
+				} else if (event.type == PeerEvent.Type.HANDSHAKE_SUCCESSFUL) {
+					connectedPeers.add(event.sender);
+				} else if (event.type == PeerEvent.Type.HANDSHAKE_FAILED) {
+					System.err.println("handshake with peer " + event.sender.peer_id + " failed.");
+					event.sender.disconnect();
+				}
 			}
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-	}
-
-	protected void consumeMessage(PeerEvent<? super MessageData> event) {
-		processMessageEvent(event);
 	}
 
 	/**
@@ -267,17 +279,18 @@ public class TorrentHandler implements PeerDelegate {
 	@SuppressWarnings("unchecked")
 	public void start() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
-		// ToolKit.print(decodedData);
+		ToolKit.print(decodedData);
 		if (decodedData != null) {
 			Object value = decodedData.get(Tracker.KEY_PEERS);
 			ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)value;
 			// ToolKit.print(peers);
 			if (peers != null) {
 				for (Map<ByteBuffer, Object> map_peer : peers) {
-					ByteBuffer id = (ByteBuffer)map_peer.get(Tracker.KEY_PEER_ID);
-					if (id != null) {
-						String new_peer_id = new String(id.array());
-						if (new_peer_id.substring(0, 3).compareTo("-RU") == 0)
+					ByteBuffer ip = (ByteBuffer)map_peer.get(Tracker.KEY_IP);
+					if (ip != null) {
+						String new_peer_ip = new String(ip.array());
+						if (new_peer_ip.compareTo("128.6.171.130") == 0 ||
+							new_peer_ip.compareTo("128.6.171.131") == 0)
 						{
 							// establish a connection with this peer
 							Peer client = Peer.peerFromMap(map_peer, this);

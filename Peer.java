@@ -28,7 +28,7 @@ public class Peer {
 	protected Boolean amChocking;
 	protected Boolean amInterested;
 
-	public BlockingQueue<PeerEvent> writeQueue;
+	public BlockingQueue<PeerEvent<? extends EventPayload>> writeQueue;
 	public PeerDelegate readThread;
 	public PeerDelegate writeThread;
 
@@ -140,15 +140,19 @@ public class Peer {
 	 * @param  message     message to send
 	 * @throws IOException if any errors occur, they will be thrown
 	 */
-	public void writeToSocket(MessageData message) throws IOException {
+	protected void writeToSocket(MessageData message) throws IOException {
 		if (output != null && message != null && message.message != null) {
 			output.write(message.message);
 			output.flush();
 		}
 	}
 
-	protected void send(MessageData message) {
-		writeQueue.put(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_TO_SEND, message));
+	public void send(MessageData message) {
+		try {
+			writeQueue.put(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_TO_SEND, message));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -189,7 +193,7 @@ public class Peer {
 				System.out.println("message " + message.type.toString() + " came in");
 				switch (message.type) {
 					case BITFIELD:
-						bitfield = Bitfield.decode(message.bitfield);
+						bitfield = Bitfield.decode(message.bitfield, delegate.getTorrentInfo().piece_hashes.length);
 						break;
 					case UNCHOKE:
 						setIsChocking(false);
@@ -205,7 +209,7 @@ public class Peer {
 						break;
 				}
 
-				isReading = delegate.peerDidReceiveMessage(this, message);
+				delegate.peerDidReceiveMessage(this, message);
 			} catch (Exception e) {
 				e.printStackTrace();
 				isReading = false;
@@ -257,9 +261,10 @@ public class Peer {
 				} else {
 					peerIsLegit = false;
 				}
+
 				delegate.peerDidHandshake(this, peerIsLegit);
 				if (readThread != null)
-					readThread.peerDidHandshake(this, event);
+					readThread.peerDidHandshake(this, peerIsLegit);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -307,9 +312,9 @@ public class Peer {
 	}
 
 	public void startThreads() {
-		StartReadTread newReadThread = new StartReadThread(this);
+		StartReadThread newReadThread = new StartReadThread(this);
 		this.readThread = newReadThread;
-		newReadThread.start();
+		(new Thread(newReadThread)).start();
 	}
 
 	protected static class StartReadThread implements Runnable, PeerDelegate {
@@ -318,15 +323,15 @@ public class Peer {
 			this.peer = peer;
 		}
 
-		protected void run() {
+		public void run() {
 			peer.start();
 		}
 		
-		protected void peerDidHandshake(Peer peer, Boolean peerIsLegit) {
+		public void peerDidHandshake(Peer peer, Boolean peerIsLegit) {
 			if (peer == this.peer && peerIsLegit == true) {
 				WriteThread newWriteThread = new WriteThread(this.peer);
 				this.peer.writeThread = newWriteThread;
-				newWriteThread.start();
+				(new Thread(newWriteThread)).start();
 				this.peer.startReading();
 			}
 		}
@@ -347,13 +352,16 @@ public class Peer {
 			this.peer = peer;
 		}
 
-		protected void run() {
+		public void run() {
 			try {
-				PeerEvent<?> event = null;
+				PeerEvent<? extends EventPayload> event = null;
 				while ((event = peer.writeQueue.take()) != null) {
-					if (event.type == PeerEvent.Type.MESSAGE_TO_SEND) {
-						PeerEvent<MessageData> msgEvent = event;
-						peer.writeToSocket(msgEvent.payload);
+					if (event.type == PeerEvent.Type.MESSAGE_TO_SEND && event.payload instanceof MessageData) {
+						try {
+							peer.writeToSocket((MessageData)event.payload);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
 					}
 				}
 			} catch (Exception e) {
