@@ -261,6 +261,7 @@ public class TorrentHandler implements PeerDelegate {
 					processMessageEvent(event.sender, (MessageData)event.payload);
 				} else if (event.type == PeerEvent.Type.HANDSHAKE_SUCCESSFUL) {
 					connectedPeers.add(event.sender);
+					System.out.println("Connected to peer: " + event.sender.ip);
 				} else if (event.type == PeerEvent.Type.HANDSHAKE_FAILED) {
 					System.err.println("handshake with peer " + event.sender.peer_id + " failed.");
 					event.sender.disconnect();
