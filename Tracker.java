@@ -35,7 +35,7 @@ public class Tracker{
 	*@param aURL = the URL of the tracker
 	*@param filesize = The size of the file to be downloaded
 	*/
-	public  Tracker(String einfo, String peerid, String aURL,int filesize){ //The initializer for a Tracker
+	public Tracker(String einfo, String peerid, String aURL,int filesize){ //The initializer for a Tracker
 		escaped_info_hash = einfo;
 		peer_id = peerid;
 		URL=aURL;

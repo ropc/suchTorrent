@@ -6,6 +6,7 @@ import java.nio.*;
 import java.nio.file.*;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.*;
 import java.security.*;
 import GivenTools.*;
 
@@ -24,6 +25,10 @@ public class TorrentHandler implements PeerDelegate {
 	public int size;
 	public Writer fileWriter;
 	public MessageData[] all_pieces;
+
+	protected BlockingQueue<PeerEvent<? extends EventPayload>> eventQueue;
+	protected List<Peer> connectedPeers;
+	protected Bitfield localBitfield;
 
 
 	/**
@@ -67,6 +72,9 @@ public class TorrentHandler implements PeerDelegate {
 		tracker = new Tracker(escaped_info_hash, peer_id, info.announce_url.toString(), size);
 		all_pieces = new MessageData[info.piece_hashes.length];
 		fileWriter = new Writer(saveFileName, info.piece_length);
+		eventQueue = new LinkedBlockingQueue<>();
+		connectedPeers = new ArrayList<>();
+		localBitfield = new Bitfield(info.piece_hashes.length);
 	}
 
 	/**
@@ -133,8 +141,17 @@ public class TorrentHandler implements PeerDelegate {
 	 * @param  message the MessageData object containing information about the message
 	 * @return         true if peer should continue reading, false if not
 	 */
-	public Boolean peerDidReceiveMessage(Peer peer, MessageData message) {
-		Boolean continueReading = false;
+	public void peerDidReceiveMessage(Peer peer, MessageData message) {
+		try {
+			eventQueue.put(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_RECEIVED, peer, message));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	protected void processMessageEvent(Peer peer, MessageData message) {
+		// Peer peer = messageEvent.sender;
+		// MessageData message = messageEvent.payload;
 		try {
 			MessageData requestMsg = null;
 			String outputString = "";
@@ -179,17 +196,15 @@ public class TorrentHandler implements PeerDelegate {
 				// for (byte muhByte : requestMsg.message)
 				// 	System.out.print(muhByte + " ");
 				// System.out.println();
-				continueReading = true;
 			} else {
-				continueReading = false;
+				System.out.println("TODO: send an event to close the connection");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("notifying tracker that download will stop");
 			tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STOPPED);
-			continueReading = false;
+			System.out.println("TODO: send an event to close the connection");
 		}
-		return continueReading;
 	}
 
 	/**
@@ -201,11 +216,16 @@ public class TorrentHandler implements PeerDelegate {
 	 *                    false if handshake was incorrect
 	 */
 	public void peerDidHandshake(Peer peer, Boolean peerIsLegit) {
+		PeerEvent.Type eventType;
 		if (peerIsLegit) {
-			peer.startReading();
+			eventType = PeerEvent.Type.HANDSHAKE_SUCCESSFUL;
 		} else {
-			System.err.println("handshake with peer " + peer.peer_id + " failed.");
-			peer.disconnect();
+			eventType = PeerEvent.Type.HANDSHAKE_FAILED;
+		}
+		try {
+			eventQueue.put(new PeerEvent<EventPayload>(eventType, peer));
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -214,7 +234,42 @@ public class TorrentHandler implements PeerDelegate {
 	 * @param peer peer that failed to create a connection
 	 */
 	public void peerDidFailToConnect(Peer peer) {
-		System.err.println("Could not connect to peer " + peer.peer_id + " at ip: " + peer.ip);
+		try {
+			eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.CONNECTION_FAILED, peer));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public String getLocalPeerId() {
+		return local_peer_id;
+	}
+
+	public TorrentInfo getTorrentInfo() {
+		return info;
+	}
+
+
+	protected void consumeEvents() {
+		PeerEvent<? extends EventPayload> event = null;
+		try {
+			while((event = eventQueue.take()) != null) {
+				if (event.type == PeerEvent.Type.CONNECTION_FAILED) {
+					System.err.println("Could not connect to peer " + event.sender.peer_id + " at ip: " + event.sender.ip);
+					// can ask user what to do here
+				} else if (event.type == PeerEvent.Type.MESSAGE_RECEIVED && event.payload instanceof MessageData) {
+					processMessageEvent(event.sender, (MessageData)event.payload);
+				} else if (event.type == PeerEvent.Type.HANDSHAKE_SUCCESSFUL) {
+					connectedPeers.add(event.sender);
+					System.out.println("Connected to peer: " + event.sender.ip);
+				} else if (event.type == PeerEvent.Type.HANDSHAKE_FAILED) {
+					System.err.println("handshake with peer " + event.sender.peer_id + " failed.");
+					event.sender.disconnect();
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -225,21 +280,22 @@ public class TorrentHandler implements PeerDelegate {
 	@SuppressWarnings("unchecked")
 	public void start() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
-		// ToolKit.print(decodedData);
+		ToolKit.print(decodedData);
 		if (decodedData != null) {
 			Object value = decodedData.get(Tracker.KEY_PEERS);
 			ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)value;
 			// ToolKit.print(peers);
 			if (peers != null) {
 				for (Map<ByteBuffer, Object> map_peer : peers) {
-					ByteBuffer id = (ByteBuffer)map_peer.get(Tracker.KEY_PEER_ID);
-					if (id != null) {
-						String new_peer_id = new String(id.array());
-						if (new_peer_id.substring(0, 3).compareTo("-RU") == 0)
+					ByteBuffer ip = (ByteBuffer)map_peer.get(Tracker.KEY_IP);
+					if (ip != null) {
+						String new_peer_ip = new String(ip.array());
+						if (new_peer_ip.compareTo("128.6.171.130") == 0 ||
+							new_peer_ip.compareTo("128.6.171.131") == 0)
 						{
 							// establish a connection with this peer
 							Peer client = Peer.peerFromMap(map_peer, this);
-							client.start(info, local_peer_id);
+							client.startThreads();
 						}
 					}
 				}
@@ -249,5 +305,6 @@ public class TorrentHandler implements PeerDelegate {
 		} else {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
+		consumeEvents();
 	}
 }
