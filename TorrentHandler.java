@@ -165,6 +165,7 @@ public class TorrentHandler implements PeerDelegate {
 			if (all_pieces[message.pieceIndex] != null) {
 				all_pieces[message.pieceIndex] = message;
 				saveTofile(message);
+				localBitfield.set(message.pieceIndex);
 				downloaded += getPieceSize(message.pieceIndex);
 			}
 			// nextPiece = message.pieceIndex + 1;

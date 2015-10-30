@@ -28,9 +28,9 @@ public class Peer {
 	protected Boolean amChocking;
 	protected Boolean amInterested;
 
-	public BlockingQueue<PeerEvent<? extends EventPayload>> writeQueue;
-	public PeerDelegate readThread;
-	public PeerDelegate writeThread;
+	public BlockingQueue<PeerEvent<? extends EventPayload>> eventQueue;
+	public PeerRunnable.StartAndReadRunnable readThread;
+	public PeerRunnable.WriteRunnable writeThread;
 
 	/**
 	 * create a Peer from a given HashMap that was decoded
@@ -63,7 +63,7 @@ public class Peer {
 		amChocking = true;
 		amInterested = false;
 		bitfield = null;
-		writeQueue = new LinkedBlockingQueue<>();
+		eventQueue = new LinkedBlockingQueue<>();
 	}
 
 	/**
@@ -149,7 +149,7 @@ public class Peer {
 
 	public void send(MessageData message) {
 		try {
-			writeQueue.put(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_TO_SEND, message));
+			eventQueue.put(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_TO_SEND, message));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -264,7 +264,7 @@ public class Peer {
 
 				delegate.peerDidHandshake(this, peerIsLegit);
 				if (readThread != null)
-					readThread.peerDidHandshake(this, peerIsLegit);
+					readThread.peerDidHandshake(peerIsLegit);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -312,71 +312,16 @@ public class Peer {
 	}
 
 	public void startThreads() {
-		StartReadThread newReadThread = new StartReadThread(this);
-		this.readThread = newReadThread;
-		(new Thread(newReadThread)).start();
+		PeerRunnable.StartAndReadRunnable newReadRunnable = new PeerRunnable.StartAndReadRunnable(this);
+		readThread = newReadRunnable;
+		(new Thread(newReadRunnable)).start();
 	}
 
-	protected static class StartReadThread implements Runnable, PeerDelegate {
-		final Peer peer;
-		protected StartReadThread(Peer peer) {
-			this.peer = peer;
-		}
-
-		public void run() {
-			peer.start();
-		}
-		
-		public void peerDidHandshake(Peer peer, Boolean peerIsLegit) {
-			if (peer == this.peer && peerIsLegit == true) {
-				WriteThread newWriteThread = new WriteThread(this.peer);
-				this.peer.writeThread = newWriteThread;
-				(new Thread(newWriteThread)).start();
-				this.peer.startReading();
-			}
-		}
-
-		public void peerDidReceiveMessage(Peer peer, MessageData message) {}
-		public void peerDidFailToConnect(Peer peer) {}
-		public String getLocalPeerId() {
-			return null;
-		}
-		public TorrentInfo getTorrentInfo() {
-			return null;
-		}
-	}
-
-	protected static class WriteThread implements Runnable, PeerDelegate {
-		final Peer peer;
-		protected WriteThread(Peer peer) {
-			this.peer = peer;
-		}
-
-		public void run() {
-			try {
-				PeerEvent<? extends EventPayload> event = null;
-				while ((event = peer.writeQueue.take()) != null) {
-					if (event.type == PeerEvent.Type.MESSAGE_TO_SEND && event.payload instanceof MessageData) {
-						try {
-							peer.writeToSocket((MessageData)event.payload);
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-					}
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-
-		public void peerDidHandshake(Peer peer, Boolean peerIsLegit) {}
-		public void peerDidReceiveMessage(Peer peer, MessageData message) {}
-		public void peerDidFailToConnect(Peer peer) {}
-		public String getLocalPeerId() {
-			return null;
-		}
-		public TorrentInfo getTorrentInfo() {
-			return null;
+	public void shutdown() {
+		try {
+			eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.SHUTDOWN, this));
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 }
