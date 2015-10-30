@@ -87,7 +87,7 @@ public class Peer {
 	 * closes the input/output streams and the socket
 	 * for this peer
 	 */
-	public void disconnect() {
+	protected void disconnect() {
 		if (input != null) {
 			try {
 				input.close();
@@ -279,35 +279,35 @@ public class Peer {
 	 * such as notifying delegate that this peer is no longer chocking
 	 */
 
-	public Boolean getIsChocking() {
+	public synchronized Boolean getIsChocking() {
 		return isChocking;
 	}
 
-	protected void setIsChocking(Boolean value) {
+	protected synchronized void setIsChocking(Boolean value) {
 		isChocking = value;
 	}
 
-	public Boolean getAmChocking() {
+	public synchronized Boolean getAmChocking() {
 		return amChocking;
 	}
 
-	public void setAmChocking(Boolean value) {
+	public synchronized void setAmChocking(Boolean value) {
 		amChocking = value;
 	}
 
-	public Boolean getIsInterested() {
+	public synchronized Boolean getIsInterested() {
 		return isInterested;
 	}
 
-	protected void setIsInterested(Boolean value) {
+	protected synchronized void setIsInterested(Boolean value) {
 		amChocking = value;
 	}
 
-	public Boolean getAmInterested() {
+	public synchronized Boolean getAmInterested() {
 		return amInterested;
 	}
 
-	public void setAmInterested(Boolean value) {
+	public synchronized void setAmInterested(Boolean value) {
 		amChocking = value;
 	}
 
@@ -320,6 +320,7 @@ public class Peer {
 	public void shutdown() {
 		try {
 			eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.SHUTDOWN, this));
+			disconnect();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
