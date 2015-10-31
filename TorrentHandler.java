@@ -30,6 +30,7 @@ public class TorrentHandler implements PeerDelegate {
 	protected List<Peer> connectedPeers;
 	protected Bitfield localBitfield;
 	protected Queue<Integer> piecesToDownload;
+	protected Queue<Integer> requestedPieces;
 
 	/**
 	 * create attempts to create a TorrentHandler out of a
@@ -78,7 +79,7 @@ public class TorrentHandler implements PeerDelegate {
 		piecesToDownload = new ArrayDeque<>(info.piece_hashes.length);
 		for (int i = 0; i < info.piece_hashes.length; i++)
 			piecesToDownload.add(i);
-
+		requestedPieces = new ArrayDeque<>(info.piece_hashes.length);
 	}
 
 	/**
@@ -162,6 +163,7 @@ public class TorrentHandler implements PeerDelegate {
 			MessageData requestMsg = new MessageData(Message.HAVE, message.pieceIndex);
 			sender.send(requestMsg);
 			System.out.println("sending HAVE piece " + message.pieceIndex + " to peer " + sender.ip);
+			requestedPieces.remove(message.pieceIndex);
 			if (all_pieces[message.pieceIndex] == null) {
 				all_pieces[message.pieceIndex] = message;
 				saveTofile(message);
@@ -201,25 +203,19 @@ public class TorrentHandler implements PeerDelegate {
 				processPieceMessage(peer, message);
 			}
 
-			Peer peerToRequest = null;
-			if (peer.getIsChocking() == true) {
-				for (Peer aPeer : connectedPeers) {
-					if (aPeer.getIsChocking() == false) 
-						peerToRequest = aPeer;
-				}
-			} else {
-				peerToRequest = peer;
+			Integer nextPiece = piecesToDownload.poll();
+			if (nextPiece == null) {
+				nextPiece = requestedPieces.poll();
+				System.out.println("HERERERERER adding " + nextPiece);
 			}
 
-			if (peerToRequest != null) {
-				Integer nextPiece = piecesToDownload.poll();
-				if (nextPiece != null) {
-					int nextPieceIndex = nextPiece.intValue();
-					int pieceSize = getPieceSize(nextPieceIndex);
-					System.out.println("sending request for piece " + nextPieceIndex + " to: " + peerToRequest.ip);
-					MessageData requestMsg = new MessageData(Message.REQUEST, nextPieceIndex, 0, pieceSize);
-					peerToRequest.send(requestMsg);
-				}
+			if (nextPiece != null) {
+				int nextPieceIndex = nextPiece.intValue();
+				int pieceSize = getPieceSize(nextPieceIndex);
+				System.out.println("sending request for piece " + nextPieceIndex + " to: " + peer.ip);
+				MessageData requestMsg = new MessageData(Message.REQUEST, nextPieceIndex, 0, pieceSize);
+				peer.send(requestMsg);
+				requestedPieces.add(nextPieceIndex);
 			}
 
 			if (downloaded == info.file_length) {
