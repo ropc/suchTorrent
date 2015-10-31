@@ -42,6 +42,19 @@ public class Bitfield {
 		this.numBits = numBits;
 	}
 
+	public Boolean get(int bitNum) {
+		Boolean value = null;
+		if (bitNum < numBits) {
+			int wantedByte = bitNum / 8;
+			byte mask = (byte)(1 << (7 - (bitNum % 8)));
+			if ((((array[wantedByte] & mask) >> (7 - (bitNum % 8))) & 1) == 1)
+				value = true;
+			else
+				value = false;
+		}
+		return value;
+	}
+
 	/**
 	 * sets the given bit to 1.
 	 * @param bitNum the position of the bit to be flipped on
@@ -80,16 +93,26 @@ public class Bitfield {
 	/**
 	 * Mostly for debugging, will print the bits in one line.
 	 */
-	public void print() {
-		System.out.print("Length: " + numBits + "  Bits: ");
+	public String toString() {
+		StringBuilder str = new StringBuilder("Bitfield Length: " + numBits + "  Bits: ");
 		for (int i = 0; i < array.length; i++) {
 			for (int j = 7; j >= 0; j--) {
 				if (((array[i] >> j) & 1) == 1)
-					System.out.print("1");
+					str.append("1");
 				else
-					System.out.print("0");
+					str.append("0");
 			}
-			System.out.print(" ");
+			str.append(" ");
+		}
+		return str.toString();
+	}
+
+	private void printByte(byte b) {
+		for (int j = 7; j >= 0; j--) {
+			if (((b >> j) & 1) == 1)
+				System.out.print("1");
+			else
+				System.out.print("0");
 		}
 		System.out.println();
 	}
