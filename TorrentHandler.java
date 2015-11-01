@@ -30,6 +30,7 @@ public class TorrentHandler implements PeerDelegate {
 	protected List<Peer> connectedPeers;
 	protected Bitfield localBitfield;
 	protected Queue<Integer> piecesToDownload;
+	protected Queue<Integer> requestedPieces;
 
 	/**
 	 * create attempts to create a TorrentHandler out of a
@@ -78,7 +79,7 @@ public class TorrentHandler implements PeerDelegate {
 		piecesToDownload = new ArrayDeque<>(info.piece_hashes.length);
 		for (int i = 0; i < info.piece_hashes.length; i++)
 			piecesToDownload.add(i);
-
+		requestedPieces = new ArrayDeque<>(info.piece_hashes.length);
 	}
 
 	/**
@@ -162,10 +163,17 @@ public class TorrentHandler implements PeerDelegate {
 			MessageData requestMsg = new MessageData(Message.HAVE, message.pieceIndex);
 			sender.send(requestMsg);
 			System.out.println("sending HAVE piece " + message.pieceIndex + " to peer " + sender.ip);
-			if (all_pieces[message.pieceIndex] != null) {
+			requestedPieces.remove(message.pieceIndex);
+			if (all_pieces[message.pieceIndex] == null) {
 				all_pieces[message.pieceIndex] = message;
 				saveTofile(message);
-				downloaded += getPieceSize(message.pieceIndex);
+				localBitfield.set(message.pieceIndex);
+				downloaded = downloaded + getPieceSize(message.pieceIndex);
+				// System.out.println("downloaded: " + downloaded + " out of " + info.file_length + " (" + ((double)downloaded / info.file_length) + ")");
+				// System.out.println("downloaded piece " + message.pieceIndex + " of size " + getPieceSize(message.pieceIndex));
+				System.out.format("downloaded %d out of %d (%.2f %%) (proccessed piece %d of size %d)\n",
+					downloaded, info.file_length, 100.0 * (double)downloaded / info.file_length,
+					message.pieceIndex, getPieceSize(message.pieceIndex));
 			}
 			// nextPiece = message.pieceIndex + 1;
 			// addDownloaded(getPieceSize(message.pieceIndex));
@@ -180,7 +188,7 @@ public class TorrentHandler implements PeerDelegate {
 		// Peer peer = messageEvent.sender;
 		// MessageData message = messageEvent.payload;
 		try {
-			String outputString = "";
+			System.out.println("Proccessing message " + message.type + " from " + peer.ip);
 			if (message.type == Message.BITFIELD) {
 				MessageData requestMsg = new MessageData(Message.INTERESTED);
 				System.out.println("sending INTERESTED");
@@ -196,21 +204,28 @@ public class TorrentHandler implements PeerDelegate {
 			}
 
 			Integer nextPiece = piecesToDownload.poll();
+			if (nextPiece == null) {
+				nextPiece = requestedPieces.poll();
+				System.out.println("HERERERERER adding " + nextPiece);
+			}
+
 			if (nextPiece != null) {
 				int nextPieceIndex = nextPiece.intValue();
 				int pieceSize = getPieceSize(nextPieceIndex);
 				System.out.println("sending request for piece " + nextPieceIndex + " to: " + peer.ip);
 				MessageData requestMsg = new MessageData(Message.REQUEST, nextPieceIndex, 0, pieceSize);
 				peer.send(requestMsg);
+				requestedPieces.add(nextPieceIndex);
 			}
-			
+
 			if (downloaded == info.file_length) {
 				// This might be getting sent early
 				System.out.println("done downloading. notifying tracker.");
 				tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
-				System.out.println("disconnecting from peer: " + peer.ip);
+				// System.out.println("disconnecting from peer: " + peer.ip);
+				disconnectPeers();
 				// should send them an event instead
-				peer.disconnect();
+				// peer.disconnect();
 				// saveTofile();
 			}
 		} catch (Exception e) {
@@ -218,6 +233,13 @@ public class TorrentHandler implements PeerDelegate {
 			System.out.println("notifying tracker that download will stop");
 			tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STOPPED);
 			System.out.println("TODO: send an event to close the connection");
+		}
+	}
+
+	protected void disconnectPeers() {
+		for (Peer peer : connectedPeers) {
+			System.out.println("shutting down peer " + peer.ip);
+			peer.shutdown();
 		}
 	}
 
@@ -285,23 +307,6 @@ public class TorrentHandler implements PeerDelegate {
 			e.printStackTrace();
 		}
 	}
-
-	// protected synchronized int getUploaded() {
-	// 	return uploaded;
-	// }
-
-	// protected synchronized void addUploaded(int amount) {
-	// 	uploaded += amount;
-	// }
-
-	// protected synchronized int getDownloaded() {
-	// 	return downloaded;
-	// }
-
-	// protected synchronized void addDownloaded(int amount) {
-	// 	downloaded += amount;
-	// 	System.out.println("downloaded " + downloaded);
-	// }
 
 	/**
 	 * Start torrent handler. Which will communicate with the tracker
