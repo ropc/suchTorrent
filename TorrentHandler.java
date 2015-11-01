@@ -15,7 +15,7 @@ import GivenTools.*;
  * schedule communication to the tracker, and maintain the
  * torrent data for a given torrent.
  */
-public class TorrentHandler implements PeerDelegate {
+public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	protected final TorrentInfo info;
 	public Tracker tracker;
 	public final String escaped_info_hash;
@@ -23,6 +23,7 @@ public class TorrentHandler implements PeerDelegate {
 	public int uploaded;
 	public int downloaded;
 	public int size;
+	public int listenPort;
 	public Writer fileWriter;
 	public MessageData[] all_pieces;
 
@@ -32,6 +33,17 @@ public class TorrentHandler implements PeerDelegate {
 	protected Queue<Integer> piecesToDownload;
 	protected Queue<Integer> requestedPieces;
 
+	public ByteBuffer getHash() {
+		return info.info_hash;
+	}
+	public void shutdown() {
+	
+	}
+	public void status() {
+
+	}
+
+
 	/**
 	 * create attempts to create a TorrentHandler out of a
 	 * given torrent file name and save file name
@@ -40,12 +52,12 @@ public class TorrentHandler implements PeerDelegate {
 	 * @return                 a properly initialized TorrentHandle if no errors,
 	 *                           if there are errors, it returns null
 	 */
-	public static TorrentHandler create(String torrentFilename, String saveFileName) {
+	public static TorrentHandler create(String torrentFilename, String saveFileName, int port) {
 		TorrentHandler newTorrent = null;
 		try {
 			TorrentInfo newInfo = new TorrentInfo(Files.readAllBytes(Paths.get(torrentFilename)));
 			String newInfoHash = URLEncoder.encode(new String(newInfo.info_hash.array(), "ISO-8859-1"), "ISO-8859-1");
-			newTorrent = new TorrentHandler(newInfo, newInfoHash, RUBTClient.generatePeerId(), saveFileName);
+			newTorrent = new TorrentHandler(newInfo, newInfoHash, RUBTClient.generatePeerId(), port, saveFileName);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.err.println("could not create torrent handler");
@@ -63,14 +75,15 @@ public class TorrentHandler implements PeerDelegate {
 	 * @throws IOException       will throw if cannot correctly initialize fileWriter
 	 *         						(which writes to the given filename)
 	 */
-	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String peer_id, String saveFileName) throws IOException {
+	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String peer_id, int port, String saveFileName) throws IOException {
 		this.info = info;
 		this.escaped_info_hash = escaped_info_hash;
 		local_peer_id = peer_id;
+		listenPort = port;
 		uploaded = 0;
 		downloaded = 0;
 		size = info.file_length;
-		tracker = new Tracker(escaped_info_hash, peer_id, info.announce_url.toString(), size);
+		tracker = new Tracker(escaped_info_hash, peer_id, listenPort, info.announce_url.toString(), size);
 		all_pieces = new MessageData[info.piece_hashes.length];
 		fileWriter = new Writer(saveFileName, info.piece_length);
 		eventQueue = new LinkedBlockingQueue<>();
@@ -117,7 +130,7 @@ public class TorrentHandler implements PeerDelegate {
 				fileWriter.writeMessage(pieceData.message);
 			}
 		} else
-			System.out.println("didnt download everything?");
+			System.err.println("didnt download everything?");
 	}
 
 	protected void saveTofile(MessageData piece) {
@@ -206,7 +219,7 @@ public class TorrentHandler implements PeerDelegate {
 			Integer nextPiece = piecesToDownload.poll();
 			if (nextPiece == null) {
 				nextPiece = requestedPieces.poll();
-				System.out.println("HERERERERER adding " + nextPiece);
+				System.out.println("Greddily adding " + nextPiece);
 			}
 
 			if (nextPiece != null) {
@@ -230,9 +243,9 @@ public class TorrentHandler implements PeerDelegate {
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.out.println("notifying tracker that download will stop");
+			System.err.println("notifying tracker that download will stop");
 			tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STOPPED);
-			System.out.println("TODO: send an event to close the connection");
+			System.err.println("TODO: send an event to close the connection");
 		}
 	}
 
@@ -314,7 +327,7 @@ public class TorrentHandler implements PeerDelegate {
 	 * the peers that begin with "-RU".
 	 */
 	@SuppressWarnings("unchecked")
-	public void start() {
+	public void run() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
 		ToolKit.print(decodedData);
 		if (decodedData != null) {

@@ -7,11 +7,12 @@ import java.util.*;
 import GivenTools.*;
 
 public class Tracker{
-	private static String escaped_info_hash; // The info hash of the file [to be passed to the tracker and to the peers]
-	private static String peer_id; // The peer_id for this user
+	private String escaped_info_hash; // The info hash of the file [to be passed to the tracker and to the peers]
+	private String peer_id; // The peer_id for this user
+   private int listenPort;
 	private int interval; //The time interval between get requests expected by the tracker
-	private static int size;//Total size of the file being downloaded
-	private static String URL; //The url of the tracker
+	private int size;//Total size of the file being downloaded
+	private String URL; //The url of the tracker
 	private int uploaded; // The amount that has been uploaded so far [since start message sent to tracker]
 	private int downloaded;// The amount that has been downloaded so far [since start message sent to tracker]
 	public enum MessageType{UNDEFINED,STARTED,STOPPED,COMPLETED} //The type of message that can be sent to the tracker
@@ -35,11 +36,12 @@ public class Tracker{
 	*@param aURL = the URL of the tracker
 	*@param filesize = The size of the file to be downloaded
 	*/
-	public Tracker(String einfo, String peerid, String aURL,int filesize){ //The initializer for a Tracker
+	public Tracker(String einfo, String peerid, int port, String aURL,int filesize){ //The initializer for a Tracker
 		escaped_info_hash = einfo;
 		peer_id = peerid;
 		URL=aURL;
 		size=filesize;
+      listenPort = port;
 		event=MessageType.STARTED;
 	}
 	
@@ -49,12 +51,12 @@ public class Tracker{
 	*@param port = the port you want to try and connect on.
 	*return: The HttpUrlConnection object that can be used to connect to the tracker
 	*/
-	private HttpURLConnection TalkToTracker(int port) {
+	private HttpURLConnection TalkToTracker() {
 		StringBuilder urlString = new StringBuilder(URL);
 		urlString.append("?info_hash=" + escaped_info_hash);
 		try {
 			urlString.append("&peer_id=" + URLEncoder.encode(peer_id, "ISO-8859-1"));
-			urlString.append("&port=" + port);
+			urlString.append("&port=" + listenPort);
 			urlString.append("&uploaded=" + uploaded);
 			urlString.append("&downloaded=" + downloaded);
 			urlString.append("&left=" + (size-downloaded));
@@ -71,7 +73,7 @@ public class Tracker{
 					break;
 			}
 			URL url = new URL(urlString.toString());
-			System.out.println(url);
+			System.err.println(url);
 			HttpURLConnection urlConnection = (HttpURLConnection)url.openConnection();
 			urlConnection.setRequestMethod("GET");
 			return urlConnection;
@@ -99,37 +101,19 @@ public class Tracker{
 		downloaded = Cdownloaded;		//Update the uploaded and downloaded amounts
 		Map<ByteBuffer, Object> retval;	//The Map that will be returned at the end of the method.
 		
-		boolean flag=true;
-		int i=6881;
 	
-		HttpURLConnection connection = TalkToTracker(i);//begin by trying to connect at the lowest port number.
-		System.out.println("Trying to connect to tracker with listen on port: " + i);
+		HttpURLConnection connection = TalkToTracker();//begin by trying to connect at the lowest port number.
 		try{
 			connection.connect();	//Try and connect to this version of the connection
 		}
 		catch(Exception e)   //if it doesn't work, set the flag to false and enter the while loop [goes to false if connection is null as well]
 		{
 			System.err.println(e.toString());
-			flag = false;
+		   System.err.println("Gave up trying to connect to Tracker");
+		   System.err.println("Shutting down...");
+		   throw new RuntimeException("Cannot recover if tracker is unreachable");
 		}							
-		//try connection until you either get a connection or run out of valid ports to try on
-		while(++i <= 6889 && (connection == null|| !flag)){
-			System.out.println("Trying again with listen on port: " + i);
-			connection = TalkToTracker(i);			
-			flag=true;
-			try{
-				connection.connect();
-			} catch(Exception e) {
-				System.err.println(e.toString());
-				flag = false;
-			}
-		}
 
-	  if (flag == false){
-		 System.err.println("Gave up trying to connect to Tracker");
-		 System.err.println("Shutting down...");
-		 throw new RuntimeException("Cannot recover if tracker is unreachable");
-	  }
 
 		byte[] content = new byte[connection.getContentLength()];
 		try {

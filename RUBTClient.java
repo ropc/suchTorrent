@@ -3,10 +3,12 @@
  */
 import java.net.*;
 import java.util.*;
+import java.nio.*;
 import GivenTools.*;
-
+import java.util.concurrent.*;
 
 public class RUBTClient {
+
 	/**
 	 * returns a randomly generated peer id to be used for
 	 * communication with peers/tracker
@@ -23,19 +25,6 @@ public class RUBTClient {
 		return sb.toString();	
 	}
 
-	public static ServerSocket getOpenServerSocket() {
-		ServerSocket newSocket = null;
-		for (int port = 6881; newSocket == null && port <= 6889; port++) {
-			try {
-				newSocket = new ServerSocket(port);
-			} catch (Exception e) {
-				System.err.println(e.toString());
-			System.out.println("Could not open port" + port);
-			}
-		}
-		return newSocket;
-	}
-
 	/**
 	 * main method for BitTorrent client.
 	 * creates a TorrentHandler object that will handle the download
@@ -44,15 +33,45 @@ public class RUBTClient {
 	 *             these should be torrentFileName saveFileName
 	 */
 	public static void main(String[] args) {
-		TorrentHandler myTorrent = null;
-		if (args.length == 2) {
-			myTorrent = TorrentHandler.create(args[0], args[1]);
+      ListenServer server;
+      ConcurrentMap<ByteBuffer, TorrentHandler> torrentMap;
+
+      torrentMap = new ConcurrentHashMap<ByteBuffer, TorrentHandler>();
+      server = ListenServer.create(torrentMap);
+      
+      int port = server.getListenPort();
+      System.out.println("Listening on port: " + port);
+     
+      Thread listener =  new Thread(server);
+      listener.start();
+     
+      TorrentHandler myTorrent;
+
+      if (args.length == 2) {
+			myTorrent = TorrentHandler.create(args[0], args[1], port);
+         torrentMap.put(myTorrent.info.info_hash, myTorrent);
 		} else {
 			System.err.println("Client takes in exactly 2 arguments: TorrentFile, SaveFileName");
+         return;
 		}
+     
+      Scanner sc = new Scanner(System.in);
 
-		if (myTorrent != null) {
-			myTorrent.start();
+      if (myTorrent != null) {
+			new Thread(myTorrent).start();
 		}
-	}
+      else{
+         System.err.println("Couldn't start torrent: " + args[0]);
+         return;
+      }
+
+      while (sc.hasNextLine()) {
+         String input = sc.nextLine();
+         System.out.println(listener.getState());
+         if (input.equals("exit")){
+            break;
+         }      
+         System.out.println("Got line: " + input);
+	   }
+   }
 }
