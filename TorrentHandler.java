@@ -15,7 +15,7 @@ import GivenTools.*;
  * schedule communication to the tracker, and maintain the
  * torrent data for a given torrent.
  */
-public class TorrentHandler implements PeerDelegate {
+public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	protected final TorrentInfo info;
 	public Tracker tracker;
 	public final String escaped_info_hash;
@@ -23,12 +23,24 @@ public class TorrentHandler implements PeerDelegate {
 	public int uploaded;
 	public int downloaded;
 	public int size;
+   public int listenPort;
 	public Writer fileWriter;
 	public MessageData[] all_pieces;
 
 	protected BlockingQueue<PeerEvent<? extends EventPayload>> eventQueue;
 	protected List<Peer> connectedPeers;
 	protected Bitfield localBitfield;
+
+
+   public ByteBuffer getHash(){
+      return info.info_hash;
+   }
+   public void shutdown(){
+      
+   }
+   public void status(){
+
+   }
 
 
 	/**
@@ -39,12 +51,12 @@ public class TorrentHandler implements PeerDelegate {
 	 * @return                 a properly initialized TorrentHandle if no errors,
 	 *                           if there are errors, it returns null
 	 */
-	public static TorrentHandler create(String torrentFilename, String saveFileName) {
+	public static TorrentHandler create(String torrentFilename, String saveFileName, int port) {
 		TorrentHandler newTorrent = null;
 		try {
 			TorrentInfo newInfo = new TorrentInfo(Files.readAllBytes(Paths.get(torrentFilename)));
 			String newInfoHash = URLEncoder.encode(new String(newInfo.info_hash.array(), "ISO-8859-1"), "ISO-8859-1");
-			newTorrent = new TorrentHandler(newInfo, newInfoHash, RUBTClient.generatePeerId(), saveFileName);
+			newTorrent = new TorrentHandler(newInfo, newInfoHash, RUBTClient.generatePeerId(), port, saveFileName);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.err.println("could not create torrent handler");
@@ -62,14 +74,15 @@ public class TorrentHandler implements PeerDelegate {
 	 * @throws IOException       will throw if cannot correctly initialize fileWriter
 	 *         						(which writes to the given filename)
 	 */
-	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String peer_id, String saveFileName) throws IOException {
+	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String peer_id, int port, String saveFileName) throws IOException {
 		this.info = info;
 		this.escaped_info_hash = escaped_info_hash;
 		local_peer_id = peer_id;
+      listenPort = port;
 		uploaded = 0;
 		downloaded = 0;
 		size = info.file_length;
-		tracker = new Tracker(escaped_info_hash, peer_id, info.announce_url.toString(), size);
+		tracker = new Tracker(escaped_info_hash, peer_id, listenPort, info.announce_url.toString(), size);
 		all_pieces = new MessageData[info.piece_hashes.length];
 		fileWriter = new Writer(saveFileName, info.piece_length);
 		eventQueue = new LinkedBlockingQueue<>();
@@ -112,7 +125,7 @@ public class TorrentHandler implements PeerDelegate {
 				fileWriter.writeMessage(pieceData.message);
 			}
 		} else
-			System.out.println("didnt download everything?");
+			System.err.println("didnt download everything?");
 	}
 
 	/**
@@ -175,7 +188,7 @@ public class TorrentHandler implements PeerDelegate {
 					downloaded += getPieceSize(message.pieceIndex);
 					// System.out.println("downloaded: " + downloaded + " picece size: " + getPieceSize(message.pieceIndex));
 				} else {
-					System.out.println("piece " + message.pieceIndex + " was incorrect.");
+					System.err.println("piece " + message.pieceIndex + " was incorrect.");
 					nextPiece = message.pieceIndex;
 				}
 				if (nextPiece < info.piece_hashes.length) {
@@ -197,13 +210,13 @@ public class TorrentHandler implements PeerDelegate {
 				// 	System.out.print(muhByte + " ");
 				// System.out.println();
 			} else {
-				System.out.println("TODO: send an event to close the connection");
+				System.err.println("TODO: send an event to close the connection");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.out.println("notifying tracker that download will stop");
+			System.err.println("notifying tracker that download will stop");
 			tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STOPPED);
-			System.out.println("TODO: send an event to close the connection");
+			System.err.println("TODO: send an event to close the connection");
 		}
 	}
 
@@ -307,4 +320,8 @@ public class TorrentHandler implements PeerDelegate {
 		}
 		consumeEvents();
 	}
+
+   public void run(){
+      start();
+   }
 }
