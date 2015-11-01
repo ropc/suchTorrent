@@ -31,6 +31,7 @@ public class Peer {
 	public BlockingQueue<PeerEvent<? extends EventPayload>> eventQueue;
 	public PeerRunnable.StartAndReadRunnable readThread;
 	public PeerRunnable.WriteRunnable writeThread;
+	private Boolean isShuttingDown;
 
 	/**
 	 * create a Peer from a given HashMap that was decoded
@@ -64,6 +65,7 @@ public class Peer {
 		amInterested = false;
 		bitfield = null;
 		eventQueue = new LinkedBlockingQueue<>();
+		isShuttingDown = false;
 	}
 
 	/**
@@ -211,7 +213,8 @@ public class Peer {
 
 				delegate.peerDidReceiveMessage(this, message);
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (getIsShuttingDown() == false)
+					e.printStackTrace();
 				isReading = false;
 				disconnect();
 			}
@@ -320,9 +323,18 @@ public class Peer {
 	public void shutdown() {
 		try {
 			eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.SHUTDOWN, this));
+			setIsShuttingDown(true);
 			disconnect();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	protected synchronized void setIsShuttingDown(Boolean value) {
+		isShuttingDown = value;
+	}
+
+	protected synchronized Boolean getIsShuttingDown() {
+		return isShuttingDown;
 	}
 }
