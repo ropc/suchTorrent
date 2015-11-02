@@ -1,7 +1,7 @@
 import java.nio.*;
 import java.net.*;
 import java.util.concurrent.*;
-import java.io.IOException;
+import java.io.*;
 
 public final class ListenServer implements Runnable{
 
@@ -20,7 +20,6 @@ public final class ListenServer implements Runnable{
             System.err.println(e.toString());
             System.err.println("Could not use port " + port);
          }
-
       }
    }
    
@@ -39,22 +38,51 @@ public final class ListenServer implements Runnable{
    }
 
    public void run() {
-      Socket sock;
+      Handshake hs = null;
+
       System.out.println("Listener Thread is running!"); 
-      try {
-         sock = listenSocket.accept();
-      
-         System.out.println("Got incoming connection from " + sock.getInetAddress().toString() + " on port " + sock.getPort());
-         sock.close();
-         System.out.println("Closed? " + sock.isClosed());
+      int i = 0;
+
+      while(i < 5){
+         System.out.println("Waiting for connection...");
          
-         listenSocket.close();
+         try(Socket sock = listenSocket.accept()){
+            System.out.println("Got incoming connection from " + sock.getInetAddress().toString() + " on port " + sock.getPort());
+            try (DataInputStream in = new DataInputStream(sock.getInputStream())){
+               byte pstrlen = in.readByte();
+               int length = (int)pstrlen + 49;
+               byte[] peer_bytes = new byte[length];
+               peer_bytes[0] = pstrlen;
+               in.readFully(peer_bytes, 1, length - 1);
+               hs = Handshake.decode(peer_bytes);
+              
+               if (torrentMap.containsKey(hs.info_hash)){
+                  TorrentDelegate torr = torrentMap.get(hs.info_hash);
+                  System.out.print("Found peer: " + hs.peer_id + " for torrent with hash: ");
+                  for(int j = 0; j < 20; j++){
+                     System.out.print(hs.info_hash.get(j));
+                  }
+                  System.out.println();
+                  //torr.createIncomingPeer(sock, hs);
+               }
+               else{
+                  System.err.println("Peer connected with unknown info-hash!");
+               }         
+            }
+            catch(EOFException e){
+               System.err.println("Reached end of Input Stream unexpectedly: " + sock.getInetAddress() + ", " + sock.getPort());
+               continue;
+            }
+            catch (Exception e){
+               System.err.println(e.toString());
+            }
+            i++;
+            System.out.println("Closed Socket: " + sock.isClosed());
+         }
+         catch(Exception e){
+            e.toString();
+         }
       }
-      catch (IOException e){
-         System.err.println(e.getMessage());
-      }
-      System.out.println("Listen Closed? " + listenSocket.isClosed());
-      
       System.out.println("Finishing thread..."); 
    }
 

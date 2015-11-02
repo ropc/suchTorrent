@@ -51,12 +51,12 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	 * @return                 a properly initialized TorrentHandle if no errors,
 	 *                           if there are errors, it returns null
 	 */
-	public static TorrentHandler create(String torrentFilename, String saveFileName, int port) {
+	public static TorrentHandler create(String torrentFilename, String saveFileName) {
 		TorrentHandler newTorrent = null;
 		try {
 			TorrentInfo newInfo = new TorrentInfo(Files.readAllBytes(Paths.get(torrentFilename)));
 			String newInfoHash = URLEncoder.encode(new String(newInfo.info_hash.array(), "ISO-8859-1"), "ISO-8859-1");
-			newTorrent = new TorrentHandler(newInfo, newInfoHash, RUBTClient.generatePeerId(), port, saveFileName);
+			newTorrent = new TorrentHandler(newInfo, newInfoHash, saveFileName);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.err.println("could not create torrent handler");
@@ -74,15 +74,15 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	 * @throws IOException       will throw if cannot correctly initialize fileWriter
 	 *         						(which writes to the given filename)
 	 */
-	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String peer_id, int port, String saveFileName) throws IOException {
+	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String saveFileName) throws IOException {
 		this.info = info;
 		this.escaped_info_hash = escaped_info_hash;
-		local_peer_id = peer_id;
-      listenPort = port;
+		local_peer_id = RUBTClient.peerId;
+      listenPort = RUBTClient.getListenPort();
 		uploaded = 0;
 		downloaded = 0;
 		size = info.file_length;
-		tracker = new Tracker(escaped_info_hash, peer_id, listenPort, info.announce_url.toString(), size);
+		tracker = new Tracker(escaped_info_hash, info.announce_url.toString(), size);
 		all_pieces = new MessageData[info.piece_hashes.length];
 		fileWriter = new Writer(saveFileName, info.piece_length);
 		eventQueue = new LinkedBlockingQueue<>();
@@ -90,13 +90,14 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		localBitfield = new Bitfield(info.piece_hashes.length);
 	}
 
-	/**
+   /**
 	 * Verifies the hash of a given piece inside a message
 	 * against the hash stored in the torrent file
 	 * @param  pieceMessage message containing the piece to be verified
 	 * @return              true if hashes match, false otherwise
 	 */
-	protected Boolean pieceIsCorrect(MessageData pieceMessage) {
+	
+   protected Boolean pieceIsCorrect(MessageData pieceMessage) {
 		Boolean isCorrect = false;
 		if (pieceMessage.type == Message.PIECE) {
 			try {
@@ -294,7 +295,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	public void start() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
 		ToolKit.print(decodedData);
-		if (decodedData != null) {
+	/*	if (decodedData != null) {
 			Object value = decodedData.get(Tracker.KEY_PEERS);
 			ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)value;
 			// ToolKit.print(peers);
@@ -303,7 +304,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 					ByteBuffer ip = (ByteBuffer)map_peer.get(Tracker.KEY_IP);
 					if (ip != null) {
 						String new_peer_ip = new String(ip.array());
-						if (new_peer_ip.compareTo("128.6.171.130") == 0 ||
+						if (new_peer_ip.compareTo("128.6.171.132") == 0 ||
 							new_peer_ip.compareTo("128.6.171.131") == 0)
 						{
 							// establish a connection with this peer
@@ -318,7 +319,8 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		} else {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
-		consumeEvents();
+		//consumeEvents();
+   */
 	}
 
    public void run(){

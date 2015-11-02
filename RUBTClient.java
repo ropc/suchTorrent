@@ -9,7 +9,9 @@ import java.util.concurrent.*;
 
 public class RUBTClient {
 
-	/**
+   public static final String peerId = generatePeerId();
+   private static int port;
+   /**
 	 * returns a randomly generated peer id to be used for
 	 * communication with peers/tracker
 	 * @return the peer id
@@ -21,9 +23,12 @@ public class RUBTClient {
 		for (int i = 0; i < 20; i++) {
 			sb.append(chars[rando.nextInt(chars.length)]);
 		}
-		System.out.println("generated peer id: " + sb.toString());
 		return sb.toString();	
 	}
+
+   public static int getListenPort(){
+      return port;
+   }
 
 	/**
 	 * main method for BitTorrent client.
@@ -33,13 +38,13 @@ public class RUBTClient {
 	 *             these should be torrentFileName saveFileName
 	 */
 	public static void main(String[] args) {
+      System.out.println("Peer ID is: " + peerId);
       ListenServer server;
       ConcurrentMap<ByteBuffer, TorrentHandler> torrentMap;
 
       torrentMap = new ConcurrentHashMap<ByteBuffer, TorrentHandler>();
       server = ListenServer.create(torrentMap);
-      
-      int port = server.getListenPort();
+      port = server.getListenPort();
       System.out.println("Listening on port: " + port);
      
       Thread listener =  new Thread(server);
@@ -48,7 +53,7 @@ public class RUBTClient {
       TorrentHandler myTorrent;
 
       if (args.length == 2) {
-			myTorrent = TorrentHandler.create(args[0], args[1], port);
+			myTorrent = TorrentHandler.create(args[0], args[1]);
          torrentMap.put(myTorrent.info.info_hash, myTorrent);
 		} else {
 			System.err.println("Client takes in exactly 2 arguments: TorrentFile, SaveFileName");
@@ -67,7 +72,6 @@ public class RUBTClient {
 
       while (sc.hasNextLine()) {
          String input = sc.nextLine();
-         System.out.println(listener.getState());
          if (input.equals("exit")){
             break;
          }      
