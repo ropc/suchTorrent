@@ -89,6 +89,20 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		connectedPeers = new ArrayList<>();
 		localBitfield = new Bitfield(info.piece_hashes.length);
 	}
+   
+   protected void createIncomingPeer(Handshake peer_hs, Socket sock){
+      Peer incPeer = Peer.peerFromHandshake( peer_hs, sock, this);
+      
+      if (incPeer != null && !incPeer.sock.isClosed() && incPeer.sock.isConnected()){
+         connectPeers.add(incPeer);
+         incPeer.startThreads();
+      }
+      else{
+         System.err.println("Something fucked up, socket is closed on incPeer");
+      }
+   }
+
+
 
    /**
 	 * Verifies the hash of a given piece inside a message
