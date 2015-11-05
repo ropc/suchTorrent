@@ -1,6 +1,13 @@
 TODO
 ====
 
+Phase 2
+-------
+
+- upload
+- time download
+- contact tracker with STOPPED when client exits
+
 Messages
 --------
 
