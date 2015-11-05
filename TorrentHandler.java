@@ -26,8 +26,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	public int listenPort;
 	public Writer fileWriter;
 	protected SessionHandler sessionHandler;
-	public MessageData[] all_pieces;
-	protected byte[][] pieces;
+	public byte[][] all_pieces;
 	private long startTime;
 	public boolean finished;
 
@@ -94,7 +93,6 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		downloaded = 0;
 		size = info.file_length;
 		tracker = new Tracker(escaped_info_hash, info.announce_url.toString(), size);
-		all_pieces = new MessageData[info.piece_hashes.length];
 		fileWriter = new Writer(saveFileName, info.piece_length);
 		eventQueue = new LinkedBlockingDeque<>();
 		connectedPeers = new ArrayList<>();
@@ -104,9 +102,9 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		startTime = System.currentTimeMillis();
 		finished = false;
 		sessionHandler = new SessionHandler(saveFileName, info.piece_length);
-		pieces = sessionHandler.getPrevSessionData();
-		if (pieces.length != info.piece_hashes.length)
-			pieces = new byte[info.piece_hashes.length][info.piece_length];
+		all_pieces = sessionHandler.getPrevSessionData();
+		if (all_pieces.length != info.piece_hashes.length)
+			all_pieces = new byte[info.piece_hashes.length][info.piece_length];
 		localBitfield = Bitfield.decode(sessionHandler.loadSession(), info.piece_hashes.length);
 		System.out.println("local bitfield: " + localBitfield);
 		if (localBitfield == null) {
@@ -164,8 +162,9 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			seconds = (int)time;
 			System.out.println("Downloaded everything. Writing to file.");
 			System.out.println("Time Elapsed since started:"+hours+":"+minutes+":"+seconds);
-			for (MessageData pieceData : all_pieces) {
-				fileWriter.writeMessage(pieceData.message);
+			for (int i = 0; i < info.piece_hashes.length; i++) {
+				if (all_pieces[i] != null)
+					fileWriter.writeData(i, ByteBuffer.wrap(all_pieces[i]));
 			}
 		} else
 			System.err.println("didnt download everything?");
@@ -216,7 +215,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			System.out.println("sending HAVE piece " + message.pieceIndex + " to peer " + sender.ip);
 			requestedPieces.remove(message.pieceIndex);
 			if (localBitfield.get(message.pieceIndex) == false) {
-				all_pieces[message.pieceIndex] = message;
+				all_pieces[message.pieceIndex] = message.block;
 				saveTofile(message);
 				localBitfield.set(message.pieceIndex);
 				try {
@@ -259,8 +258,12 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 				processPieceMessage(peer, message);
 			} else if (message.type == Message.REQUEST) {
 				if (localBitfield.get(message.pieceIndex) == true) {
-					if (all_pieces[message.pieceIndex] != null)
-						peer.send(all_pieces[message.pieceIndex]);
+					if (all_pieces[message.pieceIndex] != null){
+						byte[] block = new byte[message.blckLength];
+						System.arraycopy(all_pieces[message.pieceIndex], message.beginIndex, block, 0, message.blckLength);
+						MessageData msg = new MessageData(Message.PIECE, message.pieceIndex, message.beginIndex, block);
+						peer.send(msg);
+					}
 					else
 						System.err.println("Need to be reading from the file here");
 				}
