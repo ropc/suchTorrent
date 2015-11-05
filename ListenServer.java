@@ -9,9 +9,11 @@ public final class ListenServer implements Runnable{
 
    private ServerSocket listenSocket;
    private ConcurrentMap<ByteBuffer,TorrentHandler> torrentMap;
+   private Boolean isActive;
 
    private ListenServer (ConcurrentMap<ByteBuffer, TorrentHandler> torrents){
       torrentMap = torrents;
+      isActive = true;
       for (int port = 6881; listenSocket == null && port  < 6900; port++){
          try{
             listenSocket = new ServerSocket(port);
@@ -43,7 +45,7 @@ public final class ListenServer implements Runnable{
       System.out.println("Listener Thread is running!"); 
       int i = 0;
 
-      while(i < 5){
+      while(i < 5 && isActive){
          System.out.println("Waiting for connection...");
          
          try(Socket sock = listenSocket.accept()){
@@ -84,6 +86,15 @@ public final class ListenServer implements Runnable{
          }
       }
       System.out.println("Finishing thread..."); 
+   }
+
+   public void shutdown() {
+      isActive = false;
+      try {
+         listenSocket.close();
+      } catch (Exception e) {
+         e.printStackTrace();
+      }
    }
 
 }

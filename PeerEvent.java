@@ -3,6 +3,10 @@ public class PeerEvent<T extends EventPayload> {
 	public final Peer sender;
 	public T payload;
 
+	public PeerEvent(Type type) {
+		this(type, null, null);
+	}
+
 	public PeerEvent(Type type, T payload) {
 		this(type, null, payload);
 	}
@@ -26,6 +30,8 @@ public class PeerEvent<T extends EventPayload> {
 		HANDSHAKE_SUCCESSFUL,
 		HANDSHAKE_FAILED,
 	 	MESSAGE_RECEIVED,
-		MESSAGE_TO_SEND
+		MESSAGE_TO_SEND,
+		SHUTDOWN,
+		UNCHOKED,
 	}
 }

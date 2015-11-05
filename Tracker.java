@@ -128,4 +128,10 @@ public class Tracker{
 			return null;
 		}
 	}
+
+	public void sendStoppedMessage(){
+		event = MessageType.STOPPED;
+		TalkToTracker();
+	}
+
 }
