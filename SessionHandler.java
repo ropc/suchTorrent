@@ -6,7 +6,7 @@ import java.nio.file.*;
 import java.nio.channels.FileChannel;
 import java.io.*;
 import static java.nio.file.StandardOpenOption.*;
-
+import java.util.Arrays;
 
 public class SessionHandler{
     FileChannel infoFileWriter;
@@ -150,13 +150,15 @@ public class SessionHandler{
 		//reads only occur when there is a 1, so walking past it won't be a problem as it will never read
 	    	x=s.array();
 		RandomAccessFile f = new RandomAccessFile(Actual,"r");
+		//System.out.println(Arrays.toString(x));
 		for(int i=0; i<size;i++){
             for(int j=0;j<8;j++){
                 if(((x[i]>>j)&1)==1){
-                    	//Byte i, offset j is on!
-                    	//read(8i+jth piece from file);
-                	int pos = pieceSize*((8*i)+j);//THIS IS WHERE YOU WOULD CHANGE IF YOU MESSED UP BIG ENDIAN STUFF
-			f.read(result[(8*i)+j],pos,pieceSize);
+                    	//System.out.println("Byte "+i+", offset "+(7-j)+" is on!!!");
+                	int pos = pieceSize*((8*i)+(7-j));//THIS IS WHERE YOU WOULD CHANGE IF YOU MESSED UP BIG ENDIAN STUFF
+			//System.out.println("Getting byte:"+pos);
+			f.seek((long)pos);
+			f.read(result[(8*i)+(7-j)],0,pieceSize);
                 }
                
             }
