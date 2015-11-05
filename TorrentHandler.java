@@ -111,8 +111,8 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
       
       if (incPeer != null && !incPeer.sock.isClosed() && incPeer.sock.isConnected()){
          connectedPeers.add(incPeer);
-         
-         
+         PeerRunnable.HS_StartAndReadRunnable runnable = new PeerRunnable.HS_StartAndReadRunnable(incPeer, peer_hs);
+         (new Thread(runnable)).start();     
       }
       else{
          System.err.println("Something fucked up, socket is closed on incPeer");

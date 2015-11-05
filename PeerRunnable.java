@@ -30,8 +30,17 @@ public abstract class PeerRunnable implements Runnable {
 			peer = peerToManage;
          hs = peer_hs;
 		}
-      public void run(Handshake hs){
+
+      public void run(){
+         run (peer_hs);
+      }
          
+
+      public void run(Handshake hs){
+         WriteRunnable newWriteRunnable = new WriteRunnable(this.peer);
+         this.peer.writeThread = newWriteRunnable;
+         (new Thread(newWriteRunnable)).start();
+         handshake(hs);   
       }
 
    }
@@ -45,7 +54,7 @@ public abstract class PeerRunnable implements Runnable {
 			writeQueue = new ArrayDeque<>();
 		}
 
-		public void run() {
+		public void run() { 
 			running = true;
 			try {
 				while (running == true) {
