@@ -263,6 +263,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 						System.arraycopy(all_pieces[message.pieceIndex], message.beginIndex, block, 0, message.blckLength);
 						MessageData msg = new MessageData(Message.PIECE, message.pieceIndex, message.beginIndex, block);
 						peer.send(msg);
+						uploaded += msg.block.length;
 					}
 					else
 						System.err.println("Need to be reading from the file here");
