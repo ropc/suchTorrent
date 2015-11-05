@@ -32,15 +32,16 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	protected Bitfield localBitfield;
 
 
-   public ByteBuffer getHash(){
-      return info.info_hash;
-   }
-   public void shutdown(){
-      
-   }
-   public void status(){
+	public ByteBuffer getHash() {
+		return info.info_hash;
+	}
 
-   }
+	public void shutdown() {
+
+	}
+	public void status(){
+
+	}
 
 
 	/**

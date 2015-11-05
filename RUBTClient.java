@@ -60,19 +60,21 @@ public class RUBTClient {
          return;
 		}
      
-      Scanner sc = new Scanner(System.in);
-
       if (myTorrent != null) {
-			new Thread(myTorrent).start();
-		}
+         new Thread(myTorrent).start();
+      }
       else{
          System.err.println("Couldn't start torrent: " + args[0]);
          return;
       }
 
+      Scanner sc = new Scanner(System.in);
+
       while (sc.hasNextLine()) {
          String input = sc.nextLine();
          if (input.equals("exit")){
+            myTorrent.shutdown();
+            myTorrent.status();
             break;
          }      
          System.out.println("Got line: " + input);
