@@ -9,6 +9,8 @@ import java.util.concurrent.*;
 
 public class RUBTClient {
 
+	public static final String peerId = generatePeerId();
+	private static int port;
 	/**
 	 * returns a randomly generated peer id to be used for
 	 * communication with peers/tracker
@@ -21,8 +23,11 @@ public class RUBTClient {
 		for (int i = 0; i < 20; i++) {
 			sb.append(chars[rando.nextInt(chars.length)]);
 		}
-		System.out.println("generated peer id: " + sb.toString());
 		return sb.toString();	
+	}
+
+	public static int getListenPort(){
+		return port;
 	}
 
 	/**
@@ -32,48 +37,49 @@ public class RUBTClient {
 	 * @param args command line arguments
 	 *             these should be torrentFileName saveFileName
 	 */
-public static void main(String[] args) {
-      	ListenServer server;
-      	ConcurrentMap<ByteBuffer, TorrentHandler> torrentMap;
+	public static void main(String[] args) {
+		System.out.println("Peer ID is: " + peerId);
+		ListenServer server;
+		ConcurrentMap<ByteBuffer, TorrentHandler> torrentMap;
 
-	torrentMap = new ConcurrentHashMap<ByteBuffer, TorrentHandler>();
-      	server = ListenServer.create(torrentMap);
-      
-      	int port = server.getListenPort();
-      	System.out.println("Listening on port: " + port);
- 
-     	Thread listener;
-      	TorrentHandler myTorrent;
+		torrentMap = new ConcurrentHashMap<ByteBuffer, TorrentHandler>();
+		server = ListenServer.create(torrentMap);
+		port = server.getListenPort();
+		System.out.println("Listening on port: " + port);
 
-      	if (args.length == 2) {
-		listener = new Thread(server); //Moved it here because it was running regardless of bad args
+		Thread listener =  new Thread(server);
 		listener.start();
-		myTorrent = TorrentHandler.create(args[0], args[1], port);
-        	torrentMap.put(myTorrent.info.info_hash, myTorrent);
+
+		TorrentHandler myTorrent;
+
+		if (args.length == 2) {
+			myTorrent = TorrentHandler.create(args[0], args[1]);
+			torrentMap.put(myTorrent.info.info_hash, myTorrent);
 		} else {
 			System.err.println("Client takes in exactly 2 arguments: TorrentFile, SaveFileName");
-        		 return;
+			return;
 		}
-     
-      	Scanner sc = new Scanner(System.in);
 
-      	if (myTorrent != null) {
-		new Thread(myTorrent).start();
+		if (myTorrent != null) {
+			new Thread(myTorrent).start();
+		}
+		else{
+			System.err.println("Couldn't start torrent: " + args[0]);
+			return;
+		}
+
+		Scanner sc = new Scanner(System.in);
+		Boolean isReceivingInput = true;
+		while (isReceivingInput && sc.hasNextLine()) {
+			String input = sc.nextLine();
+			if (input.equalsIgnoreCase("exit")){
+				server.shutdown();
+				myTorrent.shutdown();
+				isReceivingInput = false;
+			} else if (input.equalsIgnoreCase("status")) {
+				myTorrent.status();
+			}
+			// System.out.println("Got line: " + input);
+		}
 	}
-      	else{
-        	System.err.println("Couldn't start torrent: " + args[0]);
-         	return;
-      	}
-
-      	while (sc.hasNextLine()) {
-         	String input = sc.nextLine();
-         	System.out.println(listener.getState());
-         	if (input.equals("exit")){
-			if(!myTorrent.finished){myTorrent.tracker.sendStoppedMessage();}
-            		break;
-         	}
-         	System.out.println("Got line: " + input);
-		
-	   }
-   }
 }

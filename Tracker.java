@@ -8,8 +8,6 @@ import GivenTools.*;
 
 public class Tracker{
 	private String escaped_info_hash; // The info hash of the file [to be passed to the tracker and to the peers]
-	private String peer_id; // The peer_id for this user
-	private int listenPort;
 	private int interval; //The time interval between get requests expected by the tracker
 	private int size;//Total size of the file being downloaded
 	private String URL; //The url of the tracker
@@ -36,12 +34,10 @@ public class Tracker{
 	*@param aURL = the URL of the tracker
 	*@param filesize = The size of the file to be downloaded
 	*/
-	public Tracker(String einfo, String peerid, int port, String aURL,int filesize){ //The initializer for a Tracker
+	public Tracker(String einfo, String aURL,int filesize){ //The initializer for a Tracker
 		escaped_info_hash = einfo;
-		peer_id = peerid;
 		URL=aURL;
 		size=filesize;
-      listenPort = port;
 		event=MessageType.STARTED;
 	}
 	
@@ -55,8 +51,8 @@ public class Tracker{
 		StringBuilder urlString = new StringBuilder(URL);
 		urlString.append("?info_hash=" + escaped_info_hash);
 		try {
-			urlString.append("&peer_id=" + URLEncoder.encode(peer_id, "ISO-8859-1"));
-			urlString.append("&port=" + listenPort);
+			urlString.append("&peer_id=" + URLEncoder.encode(RUBTClient.peerId, "ISO-8859-1"));
+			urlString.append("&port=" + RUBTClient.getListenPort());
 			urlString.append("&uploaded=" + uploaded);
 			urlString.append("&downloaded=" + downloaded);
 			urlString.append("&left=" + (size-downloaded));

@@ -94,21 +94,24 @@ public class Peer {
 			try {
 				input.close();
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (isShuttingDown == false)
+					e.printStackTrace();
 			}
 		}
 		if (output != null) {
 			try {
 				output.close();
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (isShuttingDown == false)
+					e.printStackTrace();
 			}
 		}
 		if (sock != null && !sock.isClosed()) {
 			try {
 				sock.close();
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (isShuttingDown == false)
+					e.printStackTrace();
 			}
 		}
 	}
