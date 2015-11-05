@@ -296,7 +296,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	public void start() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
 		ToolKit.print(decodedData);
-	/*	if (decodedData != null) {
+		if (decodedData != null) {
 			Object value = decodedData.get(Tracker.KEY_PEERS);
 			ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)value;
 			// ToolKit.print(peers);
@@ -320,8 +320,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		} else {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
-		//consumeEvents();
-   */
+		consumeEvents();
 	}
 
    public void run(){
