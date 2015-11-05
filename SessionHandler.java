@@ -45,16 +45,22 @@ public class SessionHandler{
     *return:the byte array representing the parts of the file already written as a byte array
     */
     public byte[] loadSession() throws IOException{
-        ByteBuffer result = ByteBuffer.allocate((int)infoFileWriter.size());
-        infoFileWriter.read(result);
-        return result.array();
+        infoFileWriter.position(0);
+	int size = (int)infoFileWriter.size();
+	byte[] x = new byte[size];
+	ByteBuffer s = ByteBuffer.allocate(size);
+	infoFileWriter.read(s);
+	x=s.array();
+//	System.out.println("Sending back byte[]: "+Arrays.toString(x));
+        return x;
     }
    
     /**
     *As above, but returns as a ByteBuffer in case that is better.
     */
     public ByteBuffer loadSessionBuff() throws IOException{
-        ByteBuffer result = ByteBuffer.allocate((int)infoFileWriter.size());
+        infoFileWriter.position(0);
+	ByteBuffer result = ByteBuffer.allocate((int)infoFileWriter.size());
         infoFileWriter.read(result);
         return result;
     }
@@ -141,6 +147,7 @@ public class SessionHandler{
 	* returns a byte[][] populated with all of the data downloaded so far. 
 	*/   
 	public byte[][] getPrevSessionData() throws IOException{
+		infoFileWriter.position(0);
 		int size = (int)infoFileWriter.size();
 		byte[] x = new byte[size];
 		ByteBuffer s = ByteBuffer.allocate(size);
@@ -150,7 +157,7 @@ public class SessionHandler{
 		//reads only occur when there is a 1, so walking past it won't be a problem as it will never read
 	    	x=s.array();
 		RandomAccessFile f = new RandomAccessFile(Actual,"r");
-		//System.out.println(Arrays.toString(x));
+		//System.out.println("IN SESSIONDATA: "+Arrays.toString(x));
 		for(int i=0; i<size;i++){
             for(int j=0;j<8;j++){
                 if(((x[i]>>j)&1)==1){
