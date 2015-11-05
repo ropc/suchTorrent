@@ -38,6 +38,9 @@ public class RUBTClient {
 	 *             these should be torrentFileName saveFileName
 	 */
 	public static void main(String[] args) {
+		Scanner sc = new Scanner(System.in);
+		Boolean isReceivingInput = true;
+
 		System.out.println("Peer ID is: " + peerId);
 		ListenServer server;
 		ConcurrentMap<ByteBuffer, TorrentHandler> torrentMap;
@@ -50,26 +53,24 @@ public class RUBTClient {
 		Thread listener =  new Thread(server);
 		listener.start();
 
-		TorrentHandler myTorrent;
+		TorrentHandler myTorrent = null;
 
 		if (args.length == 2) {
 			myTorrent = TorrentHandler.create(args[0], args[1]);
-			torrentMap.put(myTorrent.info.info_hash, myTorrent);
+			if (myTorrent != null) {
+				torrentMap.put(myTorrent.info.info_hash, myTorrent);
+				new Thread(myTorrent).start();
+			} else {
+				System.err.println("Couldn't start torrent: " + args[0]);
+				isReceivingInput = false;
+				server.shutdown();
+			}
 		} else {
 			System.err.println("Client takes in exactly 2 arguments: TorrentFile, SaveFileName");
-			return;
+			isReceivingInput = false;
+			server.shutdown();
 		}
 
-		if (myTorrent != null) {
-			new Thread(myTorrent).start();
-		}
-		else{
-			System.err.println("Couldn't start torrent: " + args[0]);
-			return;
-		}
-
-		Scanner sc = new Scanner(System.in);
-		Boolean isReceivingInput = true;
 		while (isReceivingInput && sc.hasNextLine()) {
 			String input = sc.nextLine();
 			if (input.equalsIgnoreCase("exit")){

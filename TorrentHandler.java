@@ -25,7 +25,9 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	public int size;
 	public int listenPort;
 	public Writer fileWriter;
+	protected SessionHandler sessionHandler;
 	public MessageData[] all_pieces;
+	protected byte[][] pieces;
 	private long startTime;
 	public boolean finished;
 
@@ -97,13 +99,24 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		eventQueue = new LinkedBlockingDeque<>();
 		connectedPeers = new ArrayList<>();
 		attemptingToConnectPeers = new ArrayList<>();
-		localBitfield = new Bitfield(info.piece_hashes.length);
 		piecesToDownload = new ArrayDeque<>(info.piece_hashes.length);
-		for (int i = 0; i < info.piece_hashes.length; i++)
-			piecesToDownload.add(i);
 		requestedPieces = new ArrayDeque<>(info.piece_hashes.length);
 		startTime = System.currentTimeMillis();
 		finished = false;
+		sessionHandler = new SessionHandler(saveFileName, info.piece_length);
+		pieces = sessionHandler.getPrevSessionData();
+		if (pieces.length != info.piece_hashes.length)
+			pieces = new byte[info.piece_hashes.length][info.piece_length];
+		localBitfield = Bitfield.decode(sessionHandler.loadSession(), info.piece_hashes.length);
+		if (localBitfield == null)
+			localBitfield = new Bitfield(info.piece_hashes.length);
+
+		for (int i = 0; i < info.piece_hashes.length; i++) {
+			if (localBitfield.get(i) == true)
+				downloaded += getPieceSize(i);
+			else
+				piecesToDownload.add(i);
+		}
 	}
 
    /**
@@ -199,9 +212,14 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			sender.send(requestMsg);
 			System.out.println("sending HAVE piece " + message.pieceIndex + " to peer " + sender.ip);
 			requestedPieces.remove(message.pieceIndex);
-			if (all_pieces[message.pieceIndex] == null) {
+			if (localBitfield.get(message.pieceIndex) == false) {
 				all_pieces[message.pieceIndex] = message;
 				saveTofile(message);
+				try {
+					sessionHandler.writeSession(localBitfield.array);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 				localBitfield.set(message.pieceIndex);
 				downloaded = downloaded + getPieceSize(message.pieceIndex);
 				// System.out.println("downloaded: " + downloaded + " out of " + info.file_length + " (" + ((double)downloaded / info.file_length) + ")");
