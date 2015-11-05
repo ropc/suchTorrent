@@ -45,9 +45,13 @@ public class SessionHandler{
     *return:the byte array representing the parts of the file already written as a byte array
     */
     public byte[] loadSession() throws IOException{
-        ByteBuffer result = ByteBuffer.allocate((int)infoFileWriter.size());
-        infoFileWriter.read(result);
-        return result.array();
+        int size = (int)infoFileWriter.size();
+	byte[] x = new byte[size];
+	ByteBuffer s = ByteBuffer.allocate(size);
+	infoFileWriter.read(s);
+	x=s.array();
+	System.out.println("Sending back byte[]: "+Arrays.toString(x));
+        return x;
     }
    
     /**
