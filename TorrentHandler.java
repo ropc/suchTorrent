@@ -26,6 +26,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	public int listenPort;
 	public Writer fileWriter;
 	public MessageData[] all_pieces;
+	private long startTime;
 
 	protected BlockingQueue<PeerEvent<? extends EventPayload>> eventQueue;
 	protected List<Peer> connectedPeers;
@@ -93,6 +94,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		for (int i = 0; i < info.piece_hashes.length; i++)
 			piecesToDownload.add(i);
 		requestedPieces = new ArrayDeque<>(info.piece_hashes.length);
+		startTime = System.currentTimeMillis();
 	}
 
 	/**
@@ -125,7 +127,17 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	 */
 	protected void saveTofile() {
 		if (downloaded == info.file_length) {
+			int hours,minutes,seconds,extra;
+			long time = System.currentTimeMillis();
+			time -= startTime;
+			time /= 1000;
+			hours = (int)time/3600;
+			time = time%3600;
+			minutes = (int)time/60;
+			time= time%60;
+			seconds = (int)time;
 			System.out.println("Downloaded everything. Writing to file.");
+			System.out.println("Time Elapsed since started:"+hours+":"+minutes+":"+seconds);
 			for (MessageData pieceData : all_pieces) {
 				fileWriter.writeMessage(pieceData.message);
 			}
