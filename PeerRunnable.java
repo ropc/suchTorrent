@@ -32,7 +32,7 @@ public abstract class PeerRunnable implements Runnable {
 		}
 
       public void run(){
-         run (peer_hs);
+         run (hs);
       }
          
 
@@ -40,7 +40,7 @@ public abstract class PeerRunnable implements Runnable {
          WriteRunnable newWriteRunnable = new WriteRunnable(this.peer);
          this.peer.writeThread = newWriteRunnable;
          (new Thread(newWriteRunnable)).start();
-         handshake(hs);   
+         peer.start(hs); 
       }
 
    }

@@ -324,7 +324,7 @@ public class Peer {
             if (legit){
                delegate.peerDidHandshake(this, legit);
                if (readThread != null)
-                  readThread.peerDidHandshake(this, legit);
+                  readThread.peerDidHandshake(legit);
             }
          }
          catch (Exception e){
