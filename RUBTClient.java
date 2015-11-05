@@ -69,15 +69,17 @@ public class RUBTClient {
 		}
 
 		Scanner sc = new Scanner(System.in);
-
-		while (sc.hasNextLine()) {
+		Boolean isReceivingInput = true;
+		while (isReceivingInput && sc.hasNextLine()) {
 			String input = sc.nextLine();
-			if (input.equals("exit")){
+			if (input.equalsIgnoreCase("exit")){
+				server.stop();
 				myTorrent.shutdown();
+				isReceivingInput = false;
+			} else if (input.equalsIgnoreCase("status")) {
 				myTorrent.status();
-				break;
 			}
-			System.out.println("Got line: " + input);
+			// System.out.println("Got line: " + input);
 		}
 	}
 }
