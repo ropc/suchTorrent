@@ -226,8 +226,13 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 				tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STARTED);
 			} else if (message.type == Message.PIECE) {
 				processPieceMessage(peer, message);
+			} else if (message.type == Message.REQUEST){ 	
+				if(localBitfield.get(message.pieceIndex)){
+					peer.send(all_pieces[message.pieceIndex]);
+				}
 			}
-
+			
+			
 			Integer nextPiece = piecesToDownload.poll();
 			if (nextPiece == null) {
 				nextPiece = requestedPieces.poll();
