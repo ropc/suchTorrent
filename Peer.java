@@ -133,7 +133,8 @@ public class Peer {
 				input.readFully(peer_bytes, 1, totalLength - 1);
 				peerHandshake = Handshake.decode(peer_bytes);
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (isShuttingDown == false)
+					e.printStackTrace();
 			}
 		}
 		return peerHandshake;
