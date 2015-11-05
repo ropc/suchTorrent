@@ -89,7 +89,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		this.info = info;
 		this.escaped_info_hash = escaped_info_hash;
 		local_peer_id = RUBTClient.peerId;
-      listenPort = RUBTClient.getListenPort();
+		listenPort = RUBTClient.getListenPort();
 		uploaded = 0;
 		downloaded = 0;
 		size = info.file_length;
@@ -108,8 +108,11 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		if (pieces.length != info.piece_hashes.length)
 			pieces = new byte[info.piece_hashes.length][info.piece_length];
 		localBitfield = Bitfield.decode(sessionHandler.loadSession(), info.piece_hashes.length);
-		if (localBitfield == null)
+		System.out.println("local bitfield: " + localBitfield);
+		if (localBitfield == null) {
+			System.out.println("bitfield that was read in is null");
 			localBitfield = new Bitfield(info.piece_hashes.length);
+		}
 
 		for (int i = 0; i < info.piece_hashes.length; i++) {
 			if (localBitfield.get(i) == true)
@@ -215,12 +218,12 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			if (localBitfield.get(message.pieceIndex) == false) {
 				all_pieces[message.pieceIndex] = message;
 				saveTofile(message);
+				localBitfield.set(message.pieceIndex);
 				try {
 					sessionHandler.writeSession(localBitfield.array);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
-				localBitfield.set(message.pieceIndex);
 				downloaded = downloaded + getPieceSize(message.pieceIndex);
 				// System.out.println("downloaded: " + downloaded + " out of " + info.file_length + " (" + ((double)downloaded / info.file_length) + ")");
 				// System.out.println("downloaded piece " + message.pieceIndex + " of size " + getPieceSize(message.pieceIndex));
