@@ -90,12 +90,12 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		localBitfield = new Bitfield(info.piece_hashes.length);
 	}
    
-   protected void createIncomingPeer(Handshake peer_hs, Socket sock){
+   public void createIncomingPeer(Handshake peer_hs, Socket sock){
       Peer incPeer = Peer.peerFromHandshake( peer_hs, sock, this);
       
       if (incPeer != null && !incPeer.sock.isClosed() && incPeer.sock.isConnected()){
-         connectPeers.add(incPeer);
-         incPeer.startThreads();
+         connectedPeers.add(incPeer);
+         incPeer.startThreads(peer_hs);
       }
       else{
          System.err.println("Something fucked up, socket is closed on incPeer");
@@ -309,7 +309,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	public void start() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
 		ToolKit.print(decodedData);
-	/*	if (decodedData != null) {
+		if (decodedData != null) {
 			Object value = decodedData.get(Tracker.KEY_PEERS);
 			ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)value;
 			// ToolKit.print(peers);
@@ -333,8 +333,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		} else {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
-		//consumeEvents();
-   */
+		consumeEvents();
 	}
 
    public void run(){

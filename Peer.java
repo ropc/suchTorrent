@@ -256,11 +256,12 @@ public class Peer {
 	protected void start() {
 		if (sock == null) {
 			connect();
-		   handshake();
-		}
-	   else{
-         handshake(Handshake peer_hs);
       }
+      handshake();
+   }
+
+   protected void start(Handshake peer_hs){
+      handshake(peer_hs);
    }
 
 	/**
@@ -303,7 +304,7 @@ public class Peer {
 		}
 	}
 
-   protected void handshake(Handshake peer_hs){
+   public void handshake(Handshake peer_hs){
       Handshake localHandshake = new Handshake(delegate.getTorrentInfo(), RUBTClient.peerId);
       
       Boolean legit = false;

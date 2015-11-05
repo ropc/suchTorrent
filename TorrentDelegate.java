@@ -2,6 +2,7 @@
  * Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
  **/
 import java.nio.ByteBuffer;
+import java.net.Socket;
 
 public interface TorrentDelegate {
 
