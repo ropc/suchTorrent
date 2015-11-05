@@ -214,21 +214,36 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 				tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STARTED);
 			} else if (message.type == Message.PIECE) {
 				processPieceMessage(peer, message);
+			} else if (message.type == Message.REQUEST) {
+				if (localBitfield.get(message.pieceIndex) == true) {
+					if (all_pieces[message.pieceIndex] != null)
+						peer.send(all_pieces[message.pieceIndex]);
+					else
+						System.err.println("Need to be reading from the file here");
+				}
+				// else
+				// 	Do we want to deal with the case where the peer asks us for things we don't have
+			} else if (message.type == Message.INTERESTED) {
+				peer.send(new MessageData(Message.UNCHOKE));
 			}
 
 			Integer nextPiece = piecesToDownload.poll();
 			if (nextPiece == null) {
 				nextPiece = requestedPieces.poll();
-				System.out.println("Greddily adding " + nextPiece);
+				System.out.println("Greddily requesting " + nextPiece);
 			}
 
 			if (nextPiece != null) {
 				int nextPieceIndex = nextPiece.intValue();
-				int pieceSize = getPieceSize(nextPieceIndex);
-				System.out.println("sending request for piece " + nextPieceIndex + " to: " + peer.ip);
-				MessageData requestMsg = new MessageData(Message.REQUEST, nextPieceIndex, 0, pieceSize);
-				peer.send(requestMsg);
-				requestedPieces.add(nextPieceIndex);
+				if (peer.getBitfield().get(nextPieceIndex) == true) {
+					int pieceSize = getPieceSize(nextPieceIndex);
+					System.out.println("sending request for piece " + nextPieceIndex + " to: " + peer.ip);
+					MessageData requestMsg = new MessageData(Message.REQUEST, nextPieceIndex, 0, pieceSize);
+					peer.send(requestMsg);
+					requestedPieces.add(nextPieceIndex);
+				} else {
+					piecesToDownload.add(nextPieceIndex);
+				}
 			}
 
 			if (downloaded == info.file_length) {
@@ -254,6 +269,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			System.out.println("shutting down peer " + peer.ip);
 			peer.shutdown();
 		}
+		connectedPeers.clear();
 	}
 
 	/**

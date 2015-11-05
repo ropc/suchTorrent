@@ -27,6 +27,7 @@ public class PeerEvent<T extends EventPayload> {
 		HANDSHAKE_FAILED,
 	 	MESSAGE_RECEIVED,
 		MESSAGE_TO_SEND,
-		SHUTDOWN
+		SHUTDOWN,
+		UNCHOKED,
 	}
 }
