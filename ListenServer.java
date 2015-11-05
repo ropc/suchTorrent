@@ -64,7 +64,9 @@ public final class ListenServer implements Runnable{
                      System.out.print(hs.info_hash.get(j));
                   }
                   System.out.println();
+                  in.close();
                   torr.createIncomingPeer(hs, sock);
+
                }
                else{
                   System.err.println("Peer connected with unknown info-hash!");
