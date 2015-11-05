@@ -46,6 +46,35 @@ public class Peer {
 		int port = (int)peerMap.get(Tracker.KEY_PORT);
 		return new Peer(ip, peer_id, port, delegate);
 	}
+	
+   /**
+	 * create a Peer from a Handshake and a Socket opened
+	 * by our ServerListener thread
+	 * @param  peer_hs   Handshake received from peer.
+    * @param  sock      Socket opened by ServerSocket on accept().
+	 * @param  delegate  PeerDelegate that will handle events relating to the given peer
+	 * @return           initialized Peer object
+	 */
+
+   public static Peer peerFromHandshake(Handshake peer_hs, Socket sock, PeerDelegate delegate){
+      String ip = sock.getInetAddress().toString().substring(1);
+      String peer_id = peer_hs.peer_id;
+      int port = sock.getPort();
+   
+      Peer incomingPeer = new Peer(ip, peer_id, port, delegate);
+
+      try {
+         incomingPeer.sock = sock;
+         incomingPeer.input = new DataInputStream(sock.getInputStream());
+         incomingPeer.output = new DataOutputStream(sock.getOutputStream());
+         
+         return incomingPeer;
+      }
+      catch(Exception e){
+         System.err.println("Exception when passing existing Socket to new Peer: " + e.getMessage());
+         return null;
+      }
+   }
 
 	/**
 	 * Peer constructor
@@ -235,9 +264,13 @@ public class Peer {
 	protected void start() {
 		if (sock == null) {
 			connect();
-		}
-		handshake();
-	}
+      }
+      handshake();
+   }
+
+   protected void start(Handshake peer_hs){
+      handshake(peer_hs);
+   }
 
 	/**
 	 * will initiate the handshaking process by sending the local
@@ -278,6 +311,28 @@ public class Peer {
 			}
 		}
 	}
+
+   public void handshake(Handshake peer_hs){
+      Handshake localHandshake = new Handshake(delegate.getTorrentInfo(), RUBTClient.peerId);
+      
+      Boolean legit = false;
+      if (localHandshake.info_hash.compareTo(peer_hs.info_hash) == 0){
+         legit = true;
+         try{
+            output.write(localHandshake.array);
+            output.flush();
+
+            if (legit){
+               delegate.peerDidHandshake(this, legit);
+               if (readThread != null)
+                  readThread.peerDidHandshake(legit);
+            }
+         }
+         catch (Exception e){
+            e.printStackTrace();
+         }
+      }
+   }
 
 	/**
 	 * getters/setters for choking/interested
