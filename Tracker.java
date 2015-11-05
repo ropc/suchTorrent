@@ -9,7 +9,7 @@ import GivenTools.*;
 public class Tracker{
 	private String escaped_info_hash; // The info hash of the file [to be passed to the tracker and to the peers]
 	private String peer_id; // The peer_id for this user
-   private int listenPort;
+	private int listenPort;
 	private int interval; //The time interval between get requests expected by the tracker
 	private int size;//Total size of the file being downloaded
 	private String URL; //The url of the tracker
@@ -132,4 +132,10 @@ public class Tracker{
 			return null;
 		}
 	}
+
+	public void sendStoppedMessage(){
+		event = MessageType.STOPPED;
+		TalkToTracker();
+	}
+
 }

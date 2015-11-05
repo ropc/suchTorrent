@@ -73,5 +73,6 @@ public class RUBTClient {
          }      
          System.out.println("Got line: " + input);
 	   }
+	myTorrent.tracker.sendStoppedMessage();	
    }
 }
