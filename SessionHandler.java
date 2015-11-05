@@ -6,11 +6,12 @@ import java.nio.file.*;
 import java.nio.channels.FileChannel;
 import java.io.*;
 import static java.nio.file.StandardOpenOption.*;
-
+import java.util.concurrent.locks.*;
 
 public class SessionHandler{
     FileChannel infoFileWriter;
     File Info,Actual;
+    ReentrantLock lock;
     int pieceSize;
     /**
     *Creates a SessionHandler object with a corresponding filename and piecesize
@@ -19,6 +20,7 @@ public class SessionHandler{
     *@param pSize = Size of a Piece in this torrent
     */
     public SessionHandler(String fileName, int pSize) throws IOException {
+		lock = new ReentrantLock();
 		pieceSize=pSize;
         	Path file = Paths.get("");//Get the current directory's position.
 		Path f2 = Paths.get("");
@@ -45,8 +47,10 @@ public class SessionHandler{
     *return:the byte array representing the parts of the file already written as a byte array
     */
     public byte[] loadSession() throws IOException{
-        ByteBuffer result = ByteBuffer.allocate((int)infoFileWriter.size());
+        lock.lock();
+	ByteBuffer result = ByteBuffer.allocate((int)infoFileWriter.size());
         infoFileWriter.read(result);
+	lock.unlock();
         return result.array();
     }
    
@@ -54,8 +58,10 @@ public class SessionHandler{
     *As above, but returns as a ByteBuffer in case that is better.
     */
     public ByteBuffer loadSessionBuff() throws IOException{
-        ByteBuffer result = ByteBuffer.allocate((int)infoFileWriter.size());
+        lock.lock();
+	ByteBuffer result = ByteBuffer.allocate((int)infoFileWriter.size());
         infoFileWriter.read(result);
+	lock.unlock();
         return result;
     }
    
@@ -66,7 +72,8 @@ public class SessionHandler{
     **/
     public boolean writeSession(byte[] f) throws IOException {
         boolean ret = false;
-        ret = Info.delete(); //The only way to replace data is to delete then rewrite in Java, so here we go
+        lock.lock();
+	ret = Info.delete(); //The only way to replace data is to delete then rewrite in Java, so here we go
         if(ret){
             Info.createNewFile();//Remake the file in its original image
         }
@@ -78,7 +85,7 @@ public class SessionHandler{
             System.err.println("Error writing session!");
             throw e;
         }
-       
+        lock.unlock();
         return Info.exists()&&ret;
     }
 
@@ -141,10 +148,12 @@ public class SessionHandler{
 	* returns a byte[][] populated with all of the data downloaded so far. 
 	*/   
 	public byte[][] getPrevSessionData() throws IOException{
+		lock.lock();
 		int size = (int)infoFileWriter.size();
 		byte[] x = new byte[size];
 		ByteBuffer s = ByteBuffer.allocate(size);
 		infoFileWriter.read(s);
+		lock.unlock();
 		byte[][] result = new byte[(8*size)][pieceSize]; //Size is # of bytes in bitfield file, *8 to get # of bits
 		//Was going to look for the last bit that is on, so I can stop my read, but I realize that 
 		//reads only occur when there is a 1, so walking past it won't be a problem as it will never read
