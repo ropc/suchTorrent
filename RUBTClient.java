@@ -32,47 +32,48 @@ public class RUBTClient {
 	 * @param args command line arguments
 	 *             these should be torrentFileName saveFileName
 	 */
-	public static void main(String[] args) {
-      ListenServer server;
-      ConcurrentMap<ByteBuffer, TorrentHandler> torrentMap;
+public static void main(String[] args) {
+      	ListenServer server;
+      	ConcurrentMap<ByteBuffer, TorrentHandler> torrentMap;
 
-      torrentMap = new ConcurrentHashMap<ByteBuffer, TorrentHandler>();
-      server = ListenServer.create(torrentMap);
+	torrentMap = new ConcurrentHashMap<ByteBuffer, TorrentHandler>();
+      	server = ListenServer.create(torrentMap);
       
-      int port = server.getListenPort();
-      System.out.println("Listening on port: " + port);
-     
-      Thread listener =  new Thread(server);
-      listener.start();
-     
-      TorrentHandler myTorrent;
+      	int port = server.getListenPort();
+      	System.out.println("Listening on port: " + port);
+ 
+     	Thread listener;
+      	TorrentHandler myTorrent;
 
-      if (args.length == 2) {
-			myTorrent = TorrentHandler.create(args[0], args[1], port);
-         torrentMap.put(myTorrent.info.info_hash, myTorrent);
+      	if (args.length == 2) {
+		listener = new Thread(server); //Moved it here because it was running regardless of bad args
+		listener.start();
+		myTorrent = TorrentHandler.create(args[0], args[1], port);
+        	torrentMap.put(myTorrent.info.info_hash, myTorrent);
 		} else {
 			System.err.println("Client takes in exactly 2 arguments: TorrentFile, SaveFileName");
-         return;
+        		 return;
 		}
      
-      Scanner sc = new Scanner(System.in);
+      	Scanner sc = new Scanner(System.in);
 
-      if (myTorrent != null) {
-			new Thread(myTorrent).start();
-		}
-      else{
-         System.err.println("Couldn't start torrent: " + args[0]);
-         return;
-      }
+      	if (myTorrent != null) {
+		new Thread(myTorrent).start();
+	}
+      	else{
+        	System.err.println("Couldn't start torrent: " + args[0]);
+         	return;
+      	}
 
-      while (sc.hasNextLine()) {
-         String input = sc.nextLine();
-         System.out.println(listener.getState());
-         if (input.equals("exit")){
-            break;
-         }      
-         System.out.println("Got line: " + input);
+      	while (sc.hasNextLine()) {
+         	String input = sc.nextLine();
+         	System.out.println(listener.getState());
+         	if (input.equals("exit")){
+			if(!myTorrent.finished){myTorrent.tracker.sendStoppedMessage();}
+            		break;
+         	}
+         	System.out.println("Got line: " + input);
+		
 	   }
-	myTorrent.tracker.sendStoppedMessage();	
    }
 }

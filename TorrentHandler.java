@@ -27,6 +27,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	public Writer fileWriter;
 	public MessageData[] all_pieces;
 	private long startTime;
+	public boolean finished;
 
 	protected BlockingQueue<PeerEvent<? extends EventPayload>> eventQueue;
 	protected List<Peer> connectedPeers;
@@ -95,6 +96,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			piecesToDownload.add(i);
 		requestedPieces = new ArrayDeque<>(info.piece_hashes.length);
 		startTime = System.currentTimeMillis();
+		finished = false;
 	}
 
 	/**
@@ -229,6 +231,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			} else if (message.type == Message.REQUEST){ 	
 				if(localBitfield.get(message.pieceIndex)){
 					peer.send(all_pieces[message.pieceIndex]);
+					System.out.println("Sending piece "+message.pieceIndex+" to "+peer.ip);
 				}
 			}
 			
@@ -250,9 +253,20 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 
 			if (downloaded == info.file_length) {
 				// This might be getting sent early
+				int hours,minutes,seconds,extra;
+				long time = System.currentTimeMillis();
 				System.out.println("done downloading. notifying tracker.");
 				tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
+				finished=true;
 				// System.out.println("disconnecting from peer: " + peer.ip);
+				time -= startTime;
+				time /= 1000;
+				hours = (int)time/3600;
+				time = time%3600;
+				minutes = (int)time/60;
+				time= time%60;
+				seconds = (int)time;
+				System.out.println("Time Elapsed since started:"+hours+":"+minutes+":"+seconds);
 				disconnectPeers();
 				// should send them an event instead
 				// peer.disconnect();
