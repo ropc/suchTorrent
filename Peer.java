@@ -22,7 +22,7 @@ public class Peer {
 	public Socket sock;
 	private DataInputStream input;
 	private DataOutputStream output;
-	public Bitfield bitfield;
+	protected Bitfield bitfield;
 	protected Boolean isChocking;
 	protected Boolean isInterested;
 	protected Boolean amChocking;
@@ -202,6 +202,7 @@ public class Peer {
 						break;
 					case CHOKE:
 						setIsChocking(true);
+						eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.UNCHOKED, this));
 						break;
 					case INTERESTED:
 						setIsInterested(true);
@@ -336,5 +337,9 @@ public class Peer {
 
 	protected synchronized Boolean getIsShuttingDown() {
 		return isShuttingDown;
+	}
+
+	public Bitfield getBitfield() {
+		return bitfield;
 	}
 }
