@@ -73,7 +73,7 @@ public class RUBTClient {
 		while (isReceivingInput && sc.hasNextLine()) {
 			String input = sc.nextLine();
 			if (input.equalsIgnoreCase("exit")){
-				server.stop();
+				server.shutdown();
 				myTorrent.shutdown();
 				isReceivingInput = false;
 			} else if (input.equalsIgnoreCase("status")) {

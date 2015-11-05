@@ -88,7 +88,7 @@ public final class ListenServer implements Runnable{
       System.out.println("Finishing thread..."); 
    }
 
-   public void stop() {
+   public void shutdown() {
       isActive = false;
       try {
          listenSocket.close();
