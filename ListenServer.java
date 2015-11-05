@@ -43,9 +43,8 @@ public final class ListenServer implements Runnable{
       Handshake hs = null;
 
       System.out.println("Listener Thread is running!"); 
-      int i = 0;
 
-      while(i < 5 && isActive){
+      while(isActive){
          System.out.println("Waiting for connection...");
          
          try(Socket sock = listenSocket.accept()){
@@ -78,7 +77,6 @@ public final class ListenServer implements Runnable{
             catch (Exception e){
                System.err.println(e.toString());
             }
-            i++;
             System.out.println("Closed Socket: " + sock.isClosed());
          }
          catch(Exception e){
