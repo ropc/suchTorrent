@@ -5,6 +5,7 @@ import java.net.*;
 import java.io.*;
 import java.nio.*;
 import java.util.*;
+import java.util.concurrent.*;
 import GivenTools.*;
 
 /**
@@ -21,11 +22,16 @@ public class Peer {
 	public Socket sock;
 	private DataInputStream input;
 	private DataOutputStream output;
-	public byte[] bitfield;
+	protected Bitfield bitfield;
 	protected Boolean isChocking;
 	protected Boolean isInterested;
 	protected Boolean amChocking;
 	protected Boolean amInterested;
+
+	public BlockingQueue<PeerEvent<? extends EventPayload>> eventQueue;
+	public PeerRunnable.StartAndReadRunnable readThread;
+	public PeerRunnable.WriteRunnable writeThread;
+	private Boolean isShuttingDown;
 
 	/**
 	 * create a Peer from a given HashMap that was decoded
@@ -40,6 +46,35 @@ public class Peer {
 		int port = (int)peerMap.get(Tracker.KEY_PORT);
 		return new Peer(ip, peer_id, port, delegate);
 	}
+	
+   /**
+	 * create a Peer from a Handshake and a Socket opened
+	 * by our ServerListener thread
+	 * @param  peer_hs   Handshake received from peer.
+    * @param  sock      Socket opened by ServerSocket on accept().
+	 * @param  delegate  PeerDelegate that will handle events relating to the given peer
+	 * @return           initialized Peer object
+	 */
+
+   public static Peer peerFromHandshake(Handshake peer_hs, Socket sock, PeerDelegate delegate){
+      String ip = sock.getInetAddress().toString().substring(1);
+      String peer_id = peer_hs.peer_id;
+      int port = sock.getPort();
+   
+      Peer incomingPeer = new Peer(ip, peer_id, port, delegate);
+
+      try {
+         incomingPeer.sock = sock;
+         incomingPeer.input = new DataInputStream(sock.getInputStream());
+         incomingPeer.output = new DataOutputStream(sock.getOutputStream());
+         
+         return incomingPeer;
+      }
+      catch(Exception e){
+         System.err.println("Exception when passing existing Socket to new Peer: " + e.getMessage());
+         return null;
+      }
+   }
 
 	/**
 	 * Peer constructor
@@ -58,6 +93,8 @@ public class Peer {
 		amChocking = true;
 		amInterested = false;
 		bitfield = null;
+		eventQueue = new LinkedBlockingQueue<>();
+		isShuttingDown = false;
 	}
 
 	/**
@@ -81,26 +118,29 @@ public class Peer {
 	 * closes the input/output streams and the socket
 	 * for this peer
 	 */
-	public void disconnect() {
+	protected void disconnect() {
 		if (input != null) {
 			try {
 				input.close();
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (isShuttingDown == false)
+					e.printStackTrace();
 			}
 		}
 		if (output != null) {
 			try {
 				output.close();
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (isShuttingDown == false)
+					e.printStackTrace();
 			}
 		}
 		if (sock != null && !sock.isClosed()) {
 			try {
 				sock.close();
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (isShuttingDown == false)
+					e.printStackTrace();
 			}
 		}
 	}
@@ -122,7 +162,8 @@ public class Peer {
 				input.readFully(peer_bytes, 1, totalLength - 1);
 				peerHandshake = Handshake.decode(peer_bytes);
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (isShuttingDown == false)
+					e.printStackTrace();
 			}
 		}
 		return peerHandshake;
@@ -134,10 +175,18 @@ public class Peer {
 	 * @param  message     message to send
 	 * @throws IOException if any errors occur, they will be thrown
 	 */
-	public void send(MessageData message) throws IOException {
+	protected void writeToSocket(MessageData message) throws IOException {
 		if (output != null && message != null && message.message != null) {
 			output.write(message.message);
 			output.flush();
+		}
+	}
+
+	public void send(MessageData message) {
+		try {
+			eventQueue.put(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_TO_SEND, message));
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -147,7 +196,7 @@ public class Peer {
 	 * delegate.peerDidReceiveMessage() returns true or the socket
 	 * is closed
 	 */
-	public void startReading() {
+	protected void startReading() {
 		Boolean isReading = true;
 		while (isReading) {
 			try {
@@ -179,13 +228,14 @@ public class Peer {
 				System.out.println("message " + message.type.toString() + " came in");
 				switch (message.type) {
 					case BITFIELD:
-						bitfield = message.bitfield;
+						bitfield = Bitfield.decode(message.bitfield, delegate.getTorrentInfo().piece_hashes.length);
 						break;
 					case UNCHOKE:
 						setIsChocking(false);
 						break;
 					case CHOKE:
 						setIsChocking(true);
+						eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.UNCHOKED, this));
 						break;
 					case INTERESTED:
 						setIsInterested(true);
@@ -195,9 +245,10 @@ public class Peer {
 						break;
 				}
 
-				isReading = delegate.peerDidReceiveMessage(this, message);
+				delegate.peerDidReceiveMessage(this, message);
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (getIsShuttingDown() == false)
+					e.printStackTrace();
 				isReading = false;
 				disconnect();
 			}
@@ -210,23 +261,27 @@ public class Peer {
 	 * @param info          torrentInfo
 	 * @param local_peer_id peer id for the local client (used to create the local handshake)
 	 */
-	public void start(TorrentInfo info, String local_peer_id) {
+	protected void start() {
 		if (sock == null) {
 			connect();
-		}
-		handshake(info, local_peer_id);
-	}
+      }
+      handshake();
+   }
+
+   protected void start(Handshake peer_hs){
+      handshake(peer_hs);
+   }
 
 	/**
 	 * will initiate the handshaking process by sending the local
 	 * handshake to the peer. also checks if the returning handshake is
-	 * correct. calls delegate to decide what to do next
+	 * correct. calls delegate to decide what to handshakedo next
 	 * @param info          info stored in the torrent file
 	 * @param local_peer_id local peer id used for creating the local handshake
 	 */
-	protected void handshake(TorrentInfo info, String local_peer_id) {
+	protected void handshake() {
 		if (sock != null) {
-			Handshake localHandshake = new Handshake(info, local_peer_id);
+			Handshake localHandshake = new Handshake(delegate.getTorrentInfo(), delegate.getLocalPeerId());
 			try {
 				output.write(localHandshake.array);
 				output.flush();
@@ -247,12 +302,37 @@ public class Peer {
 				} else {
 					peerIsLegit = false;
 				}
+
 				delegate.peerDidHandshake(this, peerIsLegit);
+				if (readThread != null)
+					readThread.peerDidHandshake(peerIsLegit);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
 	}
+
+   public void handshake(Handshake peer_hs){
+      Handshake localHandshake = new Handshake(delegate.getTorrentInfo(), RUBTClient.peerId);
+      
+      Boolean legit = false;
+      if (localHandshake.info_hash.compareTo(peer_hs.info_hash) == 0){
+         legit = true;
+         try{
+            output.write(localHandshake.array);
+            output.flush();
+
+            if (legit){
+               delegate.peerDidHandshake(this, legit);
+               if (readThread != null)
+                  readThread.peerDidHandshake(legit);
+            }
+         }
+         catch (Exception e){
+            e.printStackTrace();
+         }
+      }
+   }
 
 	/**
 	 * getters/setters for choking/interested
@@ -262,35 +342,63 @@ public class Peer {
 	 * such as notifying delegate that this peer is no longer chocking
 	 */
 
-	public Boolean getIsChocking() {
+	public synchronized Boolean getIsChocking() {
 		return isChocking;
 	}
 
-	protected void setIsChocking(Boolean value) {
+	protected synchronized void setIsChocking(Boolean value) {
 		isChocking = value;
 	}
 
-	public Boolean getAmChocking() {
+	public synchronized Boolean getAmChocking() {
 		return amChocking;
 	}
 
-	public void setAmChocking(Boolean value) {
+	public synchronized void setAmChocking(Boolean value) {
 		amChocking = value;
 	}
 
-	public Boolean getIsInterested() {
+	public synchronized Boolean getIsInterested() {
 		return isInterested;
 	}
 
-	protected void setIsInterested(Boolean value) {
+	protected synchronized void setIsInterested(Boolean value) {
 		amChocking = value;
 	}
 
-	public Boolean getAmInterested() {
+	public synchronized Boolean getAmInterested() {
 		return amInterested;
 	}
 
-	public void setAmInterested(Boolean value) {
+	public synchronized void setAmInterested(Boolean value) {
 		amChocking = value;
+	}
+
+	public void startThreads() {
+		PeerRunnable.StartAndReadRunnable newReadRunnable = new PeerRunnable.StartAndReadRunnable(this);
+		readThread = newReadRunnable;
+		(new Thread(newReadRunnable)).start();
+	}
+
+	public void shutdown() {
+		try {
+			eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.SHUTDOWN, this));
+			setIsShuttingDown(true);
+			disconnect();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	protected synchronized void setIsShuttingDown(Boolean value) {
+		isShuttingDown = value;
+	}
+
+	protected synchronized Boolean getIsShuttingDown() {
+		return isShuttingDown;
+	}
+
+	public Bitfield getBitfield() {
+		return bitfield;
 	}
 }

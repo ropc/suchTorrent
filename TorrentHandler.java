@@ -6,6 +6,7 @@ import java.nio.*;
 import java.nio.file.*;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.*;
 import java.security.*;
 import GivenTools.*;
 
@@ -14,16 +15,42 @@ import GivenTools.*;
  * schedule communication to the tracker, and maintain the
  * torrent data for a given torrent.
  */
-public class TorrentHandler implements PeerDelegate {
-	public final TorrentInfo info;
+public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
+	protected final TorrentInfo info;
 	public Tracker tracker;
 	public final String escaped_info_hash;
-	public String local_peer_id;
+	protected String local_peer_id;
 	public int uploaded;
 	public int downloaded;
 	public int size;
+	public int listenPort;
 	public Writer fileWriter;
-	public MessageData[] all_pieces;
+	protected SessionHandler sessionHandler;
+	public byte[][] all_pieces;
+	private long startTime;
+	public boolean finished;
+
+	protected BlockingDeque<PeerEvent<? extends EventPayload>> eventQueue;
+	protected List<Peer> connectedPeers;
+	protected List<Peer> attemptingToConnectPeers;
+	protected Bitfield localBitfield;
+	protected Queue<Integer> piecesToDownload;
+	protected Queue<Integer> requestedPieces;
+
+	public ByteBuffer getHash() {
+		return info.info_hash;
+	}
+	public void shutdown() {
+		try {
+			eventQueue.putFirst(new PeerEvent<EventPayload>(PeerEvent.Type.SHUTDOWN));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+	}
+	public void status(){
+		System.out.format("downloaded: %d, uploaded: %d\n", downloaded, uploaded);
+	}
 
 
 	/**
@@ -39,7 +66,7 @@ public class TorrentHandler implements PeerDelegate {
 		try {
 			TorrentInfo newInfo = new TorrentInfo(Files.readAllBytes(Paths.get(torrentFilename)));
 			String newInfoHash = URLEncoder.encode(new String(newInfo.info_hash.array(), "ISO-8859-1"), "ISO-8859-1");
-			newTorrent = new TorrentHandler(newInfo, newInfoHash, RUBTClient.generatePeerId(), saveFileName);
+			newTorrent = new TorrentHandler(newInfo, newInfoHash, saveFileName);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.err.println("could not create torrent handler");
@@ -57,25 +84,65 @@ public class TorrentHandler implements PeerDelegate {
 	 * @throws IOException       will throw if cannot correctly initialize fileWriter
 	 *         						(which writes to the given filename)
 	 */
-	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String peer_id, String saveFileName) throws IOException {
+	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String saveFileName) throws IOException {
 		this.info = info;
 		this.escaped_info_hash = escaped_info_hash;
-		local_peer_id = peer_id;
+		local_peer_id = RUBTClient.peerId;
+		listenPort = RUBTClient.getListenPort();
 		uploaded = 0;
 		downloaded = 0;
 		size = info.file_length;
-		tracker = new Tracker(escaped_info_hash, peer_id, info.announce_url.toString(), size);
-		all_pieces = new MessageData[info.piece_hashes.length];
+		tracker = new Tracker(escaped_info_hash, info.announce_url.toString(), size);
 		fileWriter = new Writer(saveFileName, info.piece_length);
-	}
+		eventQueue = new LinkedBlockingDeque<>();
+		connectedPeers = new ArrayList<>();
+		attemptingToConnectPeers = new ArrayList<>();
+		piecesToDownload = new ArrayDeque<>(info.piece_hashes.length);
+		requestedPieces = new ArrayDeque<>(info.piece_hashes.length);
+		startTime = System.currentTimeMillis();
+		finished = false;
+		sessionHandler = new SessionHandler(saveFileName, info.piece_length);
+		all_pieces = sessionHandler.getPrevSessionData();
+		if (all_pieces.length != info.piece_hashes.length)
+			all_pieces = new byte[info.piece_hashes.length][info.piece_length];
+		localBitfield = Bitfield.decode(sessionHandler.loadSession(), info.piece_hashes.length);
+		System.out.println("local bitfield: " + localBitfield);
+		if (localBitfield == null) {
+			System.out.println("bitfield that was read in is null");
+			localBitfield = new Bitfield(info.piece_hashes.length);
+		}
 
-	/**
+		for (int i = 0; i < info.piece_hashes.length; i++) {
+			if (localBitfield.get(i) == true)
+				downloaded += getPieceSize(i);
+			else
+				piecesToDownload.add(i);
+		}
+	}
+   
+   public void createIncomingPeer(Handshake peer_hs, Socket sock){
+      Peer incPeer = Peer.peerFromHandshake( peer_hs, sock, this);
+      
+      if (incPeer != null && !incPeer.sock.isClosed() && incPeer.sock.isConnected()){
+         connectedPeers.add(incPeer);
+         PeerRunnable.HS_StartAndReadRunnable runnable = new PeerRunnable.HS_StartAndReadRunnable(incPeer, peer_hs);
+         (new Thread(runnable)).start();     
+      }
+      else{
+         System.err.println("Something fucked up, socket is closed on incPeer");
+      }
+   }
+
+
+
+   /**
 	 * Verifies the hash of a given piece inside a message
 	 * against the hash stored in the torrent file
 	 * @param  pieceMessage message containing the piece to be verified
 	 * @return              true if hashes match, false otherwise
 	 */
-	protected Boolean pieceIsCorrect(MessageData pieceMessage) {
+	
+   protected Boolean pieceIsCorrect(MessageData pieceMessage) {
 		Boolean isCorrect = false;
 		if (pieceMessage.type == Message.PIECE) {
 			try {
@@ -97,14 +164,29 @@ public class TorrentHandler implements PeerDelegate {
 	 * Called once download is completed, will only try to save
 	 * if the the download is complete.
 	 */
-	public void saveTofile() {
+	protected void saveTofile() {
 		if (downloaded == info.file_length) {
+			int hours,minutes,seconds,extra;
+			long time = System.currentTimeMillis();
+			time -= startTime;
+			time /= 1000;
+			hours = (int)time/3600;
+			time = time%3600;
+			minutes = (int)time/60;
+			time= time%60;
+			seconds = (int)time;
 			System.out.println("Downloaded everything. Writing to file.");
-			for (MessageData pieceData : all_pieces) {
-				fileWriter.writeMessage(pieceData.message);
+			System.out.println("Time Elapsed since started:"+hours+":"+minutes+":"+seconds);
+			for (int i = 0; i < info.piece_hashes.length; i++) {
+				if (all_pieces[i] != null)
+					fileWriter.writeData(i, ByteBuffer.wrap(all_pieces[i]));
 			}
 		} else
-			System.out.println("didnt download everything?");
+			System.err.println("didnt download everything?");
+	}
+
+	protected void saveTofile(MessageData piece) {
+		fileWriter.writeMessage(piece.message);
 	}
 
 	/**
@@ -133,63 +215,140 @@ public class TorrentHandler implements PeerDelegate {
 	 * @param  message the MessageData object containing information about the message
 	 * @return         true if peer should continue reading, false if not
 	 */
-	public Boolean peerDidReceiveMessage(Peer peer, MessageData message) {
-		Boolean continueReading = false;
+	public void peerDidReceiveMessage(Peer peer, MessageData message) {
 		try {
-			MessageData requestMsg = null;
-			String outputString = "";
+			eventQueue.putLast(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_RECEIVED, peer, message));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	protected void processPieceMessage(Peer sender, MessageData message) {
+		if (pieceIsCorrect(message)) {
+			MessageData requestMsg = new MessageData(Message.HAVE, message.pieceIndex);
+			sender.send(requestMsg);
+			System.out.println("sending HAVE piece " + message.pieceIndex + " to peer " + sender.ip);
+			requestedPieces.remove(message.pieceIndex);
+			if (localBitfield.get(message.pieceIndex) == false) {
+				all_pieces[message.pieceIndex] = message.block;
+				saveTofile(message);
+				localBitfield.set(message.pieceIndex);
+				try {
+					sessionHandler.writeSession(localBitfield.array);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				downloaded = downloaded + getPieceSize(message.pieceIndex);
+				// System.out.println("downloaded: " + downloaded + " out of " + info.file_length + " (" + ((double)downloaded / info.file_length) + ")");
+				// System.out.println("downloaded piece " + message.pieceIndex + " of size " + getPieceSize(message.pieceIndex));
+				System.out.format("downloaded %d out of %d (%.2f %%) (proccessed piece %d of size %d)\n",
+					downloaded, info.file_length, 100.0 * (double)downloaded / info.file_length,
+					message.pieceIndex, getPieceSize(message.pieceIndex));
+			}
+			// nextPiece = message.pieceIndex + 1;
+			// addDownloaded(getPieceSize(message.pieceIndex));
+			// System.out.println("downloaded: " + downloaded + " picece size: " + getPieceSize(message.pieceIndex));
+		} else {
+			System.out.println("piece " + message.pieceIndex + " was incorrect.");
+			piecesToDownload.add(message.pieceIndex);
+		}
+	}
+
+	protected void processMessageEvent(Peer peer, MessageData message) {
+		// Peer peer = messageEvent.sender;
+		// MessageData message = messageEvent.payload;
+		try {
+			System.out.println("Proccessing message " + message.type + " from " + peer.ip);
 			if (message.type == Message.BITFIELD) {
-				requestMsg = new MessageData(Message.INTERESTED);
-				outputString = "sending INTERESTED";
+				MessageData requestMsg = new MessageData(Message.INTERESTED);
+				System.out.println("sending INTERESTED");
+				peer.send(requestMsg);
 			} else if (message.type == Message.UNCHOKE) {
-				requestMsg = new MessageData(Message.REQUEST, 0, 0, info.piece_length);
-				outputString = "sending request for piece 0";
+				// MessageData requestMsg = new MessageData(Message.REQUEST, 0, 0, info.piece_length);
+				// System.out.println("sending request for piece 0 to " + peer.ip);
+				// peer.send(requestMsg);
 				System.out.println("notifying tracker will start to download");
 				tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STARTED);
 			} else if (message.type == Message.PIECE) {
-				int nextPiece;
-				if (pieceIsCorrect(message)) {
-					requestMsg = new MessageData(Message.HAVE, message.pieceIndex);
-					peer.send(requestMsg);
-					System.out.println("sending HAVE piece " + message.pieceIndex + " to peer");
-					requestMsg = null;
-					all_pieces[message.pieceIndex] = message;
-					nextPiece = message.pieceIndex + 1;
-					downloaded += getPieceSize(message.pieceIndex);
-					// System.out.println("downloaded: " + downloaded + " picece size: " + getPieceSize(message.pieceIndex));
-				} else {
-					System.out.println("piece " + message.pieceIndex + " was incorrect.");
-					nextPiece = message.pieceIndex;
+				processPieceMessage(peer, message);
+			} else if (message.type == Message.REQUEST) {
+				if (localBitfield.get(message.pieceIndex) == true) {
+					if (all_pieces[message.pieceIndex] != null){
+						byte[] block = new byte[message.blckLength];
+						System.arraycopy(all_pieces[message.pieceIndex], message.beginIndex, block, 0, message.blckLength);
+						MessageData msg = new MessageData(Message.PIECE, message.pieceIndex, message.beginIndex, block);
+						peer.send(msg);
+						uploaded += msg.block.length;
+					}
+					else
+						System.err.println("Need to be reading from the file here");
 				}
-				if (nextPiece < info.piece_hashes.length) {
-					int pieceSize = getPieceSize(nextPiece);
-					requestMsg = new MessageData(Message.REQUEST, nextPiece, 0, pieceSize);
-					outputString = "sending request for piece " + nextPiece;
+				// else
+				// 	Do we want to deal with the case where the peer asks us for things we don't have
+			} else if (message.type == Message.INTERESTED) {
+				peer.send(new MessageData(Message.UNCHOKE));
+			}
+			
+			
+			Integer nextPiece = piecesToDownload.poll();
+			if (nextPiece == null) {
+				nextPiece = requestedPieces.poll();
+				System.out.println("Greddily requesting " + nextPiece);
+			}
+
+			if (nextPiece != null) {
+				int nextPieceIndex = nextPiece.intValue();
+				if (peer.getBitfield().get(nextPieceIndex) == true) {
+					int pieceSize = getPieceSize(nextPieceIndex);
+					System.out.println("sending request for piece " + nextPieceIndex + " to: " + peer.ip);
+					MessageData requestMsg = new MessageData(Message.REQUEST, nextPieceIndex, 0, pieceSize);
+					peer.send(requestMsg);
+					requestedPieces.add(nextPieceIndex);
 				} else {
-					System.out.println("done downloading. notifying tracker.");
-					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
-					System.out.println("disconnecting from peer: " + peer.peer_id);
-					peer.disconnect();
-					saveTofile();
+					piecesToDownload.add(nextPieceIndex);
 				}
 			}
-			if (requestMsg != null) {
-				peer.send(requestMsg);
-				System.out.println(outputString);
-				// for (byte muhByte : requestMsg.message)
-				// 	System.out.print(muhByte + " ");
-				// System.out.println();
-				continueReading = true;
-			} else {
-				continueReading = false;
+
+			if (downloaded == info.file_length) {
+				// This might be getting sent early
+				int hours,minutes,seconds,extra;
+				long time = System.currentTimeMillis();
+				System.out.println("done downloading. notifying tracker.");
+				tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
+				finished=true;
+				// System.out.println("disconnecting from peer: " + peer.ip);
+				time -= startTime;
+				time /= 1000;
+				hours = (int)time/3600;
+				time = time%3600;
+				minutes = (int)time/60;
+				time= time%60;
+				seconds = (int)time;
+				System.out.println("Time Elapsed since started:"+hours+":"+minutes+":"+seconds);
+				disconnectPeers();
+				// should send them an event instead
+				// peer.disconnect();
+				// saveTofile();
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.out.println("notifying tracker that download will stop");
+			System.err.println("notifying tracker that download will stop");
 			tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STOPPED);
-			continueReading = false;
+			System.err.println("TODO: send an event to close the connection");
 		}
-		return continueReading;
+	}
+
+	protected void disconnectPeers() {
+		for (Peer peer : connectedPeers) {
+			System.out.println("shutting down peer " + peer.ip);
+			peer.shutdown();
+		}
+		connectedPeers.clear();
+		for (Peer peer : attemptingToConnectPeers) {
+			System.out.println("shutting down peer " + peer.ip);
+			peer.shutdown();
+		}
+		attemptingToConnectPeers.clear();
 	}
 
 	/**
@@ -201,11 +360,16 @@ public class TorrentHandler implements PeerDelegate {
 	 *                    false if handshake was incorrect
 	 */
 	public void peerDidHandshake(Peer peer, Boolean peerIsLegit) {
+		PeerEvent.Type eventType;
 		if (peerIsLegit) {
-			peer.startReading();
+			eventType = PeerEvent.Type.HANDSHAKE_SUCCESSFUL;
 		} else {
-			System.err.println("handshake with peer " + peer.peer_id + " failed.");
-			peer.disconnect();
+			eventType = PeerEvent.Type.HANDSHAKE_FAILED;
+		}
+		try {
+			eventQueue.putLast(new PeerEvent<EventPayload>(eventType, peer));
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -214,7 +378,48 @@ public class TorrentHandler implements PeerDelegate {
 	 * @param peer peer that failed to create a connection
 	 */
 	public void peerDidFailToConnect(Peer peer) {
-		System.err.println("Could not connect to peer " + peer.peer_id + " at ip: " + peer.ip);
+		try {
+			eventQueue.putLast(new PeerEvent<EventPayload>(PeerEvent.Type.CONNECTION_FAILED, peer));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public String getLocalPeerId() {
+		return local_peer_id;
+	}
+
+	public TorrentInfo getTorrentInfo() {
+		return info;
+	}
+
+
+	protected void consumeEvents() {
+		PeerEvent<? extends EventPayload> event = null;
+		Boolean isRunning = true;
+		try {
+			while(isRunning && (event = eventQueue.takeFirst()) != null) {
+				if (event.type == PeerEvent.Type.CONNECTION_FAILED) {
+					System.err.println("Could not connect to peer " + event.sender.peer_id + " at ip: " + event.sender.ip);
+					// can ask user what to do here
+				} else if (event.type == PeerEvent.Type.MESSAGE_RECEIVED && event.payload instanceof MessageData) {
+					processMessageEvent(event.sender, (MessageData)event.payload);
+				} else if (event.type == PeerEvent.Type.HANDSHAKE_SUCCESSFUL) {
+					attemptingToConnectPeers.remove(event.sender);
+					connectedPeers.add(event.sender);
+					System.out.println("Connected to peer: " + event.sender.ip);
+				} else if (event.type == PeerEvent.Type.HANDSHAKE_FAILED) {
+					System.err.println("handshake with peer " + event.sender.peer_id + " failed.");
+					event.sender.disconnect();
+				} else if (event.type == PeerEvent.Type.SHUTDOWN) {
+					disconnectPeers();
+					tracker.sendStoppedMessage();
+					isRunning = false;
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -223,23 +428,25 @@ public class TorrentHandler implements PeerDelegate {
 	 * the peers that begin with "-RU".
 	 */
 	@SuppressWarnings("unchecked")
-	public void start() {
+	public void run() {
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
-		// ToolKit.print(decodedData);
+		ToolKit.print(decodedData);
 		if (decodedData != null) {
 			Object value = decodedData.get(Tracker.KEY_PEERS);
 			ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)value;
 			// ToolKit.print(peers);
 			if (peers != null) {
 				for (Map<ByteBuffer, Object> map_peer : peers) {
-					ByteBuffer id = (ByteBuffer)map_peer.get(Tracker.KEY_PEER_ID);
-					if (id != null) {
-						String new_peer_id = new String(id.array());
-						if (new_peer_id.substring(0, 3).compareTo("-RU") == 0)
+					ByteBuffer ip = (ByteBuffer)map_peer.get(Tracker.KEY_IP);
+					if (ip != null) {
+						String new_peer_ip = new String(ip.array());
+						if (new_peer_ip.compareTo("128.6.171.130") == 0 ||
+							new_peer_ip.compareTo("128.6.171.131") == 0)
 						{
 							// establish a connection with this peer
 							Peer client = Peer.peerFromMap(map_peer, this);
-							client.start(info, local_peer_id);
+							attemptingToConnectPeers.add(client);
+							client.startThreads();
 						}
 					}
 				}
@@ -249,5 +456,6 @@ public class TorrentHandler implements PeerDelegate {
 		} else {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
+		consumeEvents();
 	}
 }

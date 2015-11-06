@@ -3,10 +3,14 @@
  */
 import java.net.*;
 import java.util.*;
+import java.nio.*;
 import GivenTools.*;
-
+import java.util.concurrent.*;
 
 public class RUBTClient {
+
+	public static final String peerId = generatePeerId();
+	private static int port;
 	/**
 	 * returns a randomly generated peer id to be used for
 	 * communication with peers/tracker
@@ -19,21 +23,11 @@ public class RUBTClient {
 		for (int i = 0; i < 20; i++) {
 			sb.append(chars[rando.nextInt(chars.length)]);
 		}
-		System.out.println("generated peer id: " + sb.toString());
 		return sb.toString();	
 	}
 
-	public static ServerSocket getOpenServerSocket() {
-		ServerSocket newSocket = null;
-		for (int port = 6881; newSocket == null && port <= 6889; port++) {
-			try {
-				newSocket = new ServerSocket(port);
-			} catch (Exception e) {
-				System.err.println(e.toString());
-			System.out.println("Could not open port" + port);
-			}
-		}
-		return newSocket;
+	public static int getListenPort(){
+		return port;
 	}
 
 	/**
@@ -44,15 +38,49 @@ public class RUBTClient {
 	 *             these should be torrentFileName saveFileName
 	 */
 	public static void main(String[] args) {
+		Scanner sc = new Scanner(System.in);
+		Boolean isReceivingInput = true;
+
+		System.out.println("Peer ID is: " + peerId);
+		ListenServer server;
+		ConcurrentMap<ByteBuffer, TorrentHandler> torrentMap;
+
+		torrentMap = new ConcurrentHashMap<ByteBuffer, TorrentHandler>();
+		server = ListenServer.create(torrentMap);
+		port = server.getListenPort();
+		System.out.println("Listening on port: " + port);
+
+		Thread listener =  new Thread(server);
+		listener.start();
+
 		TorrentHandler myTorrent = null;
+
 		if (args.length == 2) {
 			myTorrent = TorrentHandler.create(args[0], args[1]);
+			if (myTorrent != null) {
+				torrentMap.put(myTorrent.info.info_hash, myTorrent);
+				new Thread(myTorrent).start();
+			} else {
+				System.err.println("Couldn't start torrent: " + args[0]);
+				isReceivingInput = false;
+				server.shutdown();
+			}
 		} else {
 			System.err.println("Client takes in exactly 2 arguments: TorrentFile, SaveFileName");
+			isReceivingInput = false;
+			server.shutdown();
 		}
 
-		if (myTorrent != null) {
-			myTorrent.start();
+		while (isReceivingInput && sc.hasNextLine()) {
+			String input = sc.nextLine();
+			if (input.equalsIgnoreCase("exit")){
+				server.shutdown();
+				myTorrent.shutdown();
+				isReceivingInput = false;
+			} else if (input.equalsIgnoreCase("status")) {
+				myTorrent.status();
+			}
+			// System.out.println("Got line: " + input);
 		}
 	}
 }
