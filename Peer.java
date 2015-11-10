@@ -146,30 +146,6 @@ public class Peer {
 	}
 
 	/**
-	 * Reads the input stream and will parse
-	 * a handshake.
-	 * @return the handshake it finds (handshake the peer sends)
-	 */
-	public Handshake readHandshake() {
-		Handshake peerHandshake = null;
-		if (input != null) {
-			try {
-				byte pstrlen = input.readByte();
-				int totalLength = (int)pstrlen + 49;
-				// System.out.println("going to read handshake of total length: " + totalLength);
-				byte[] peer_bytes = new byte[totalLength];
-				peer_bytes[0] = pstrlen;
-				input.readFully(peer_bytes, 1, totalLength - 1);
-				peerHandshake = Handshake.decode(peer_bytes);
-			} catch (Exception e) {
-				if (isShuttingDown == false)
-					e.printStackTrace();
-			}
-		}
-		return peerHandshake;
-	}
-
-	/**
 	 * sends a MessageData if possible. Used primarily by the PeerDelegate
 	 * to send a message before listening again
 	 * @param  message     message to send
@@ -294,7 +270,7 @@ public class Peer {
 				// System.out.print("\n");
 				////
 				
-				Handshake peerHandshake = readHandshake();
+				Handshake peerHandshake = Handshake.readInHandshake(input);
 
 				Boolean peerIsLegit;
 				if (localHandshake.info_hash.compareTo(peerHandshake.info_hash) == 0 && peer_id.equals(peerHandshake.peer_id)) {
