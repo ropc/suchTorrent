@@ -64,7 +64,7 @@ public final class ListenServer implements Runnable{
                      System.out.print(hs.info_hash.get(j));
                   }
                   System.out.println();
-                  in.close();
+                  // in.close();
                   torr.createIncomingPeer(hs, sock);
 
                }

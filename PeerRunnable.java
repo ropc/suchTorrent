@@ -22,28 +22,28 @@ public abstract class PeerRunnable implements Runnable {
 			}
 		}
 	}
-   
-   public static class HS_StartAndReadRunnable extends PeerRunnable {
-      protected Handshake hs;
+
+	public static class HS_StartAndReadRunnable extends StartAndReadRunnable {
+		protected Handshake hs;
 
 		public HS_StartAndReadRunnable(Peer peerToManage, Handshake peer_hs) {
-			peer = peerToManage;
-         hs = peer_hs;
+			super(peerToManage);
+			hs = peer_hs;
 		}
 
-      public void run(){
-         run (hs);
-      }
-         
+		@Override
+		public void run(){
+			run(hs);
+		}
 
-      public void run(Handshake hs){
-         WriteRunnable newWriteRunnable = new WriteRunnable(this.peer);
-         this.peer.writeThread = newWriteRunnable;
-         (new Thread(newWriteRunnable)).start();
-         peer.start(hs); 
-      }
+		public void run(Handshake hs){
+			WriteRunnable newWriteRunnable = new WriteRunnable(this.peer);
+			this.peer.writeThread = newWriteRunnable;
+			(new Thread(newWriteRunnable)).start();
+			peer.start(hs); 
+		}
+	}
 
-   }
 	public static class WriteRunnable extends PeerRunnable {
 		private Boolean running;
 		private Queue<MessageData> writeQueue;
