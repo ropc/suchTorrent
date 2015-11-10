@@ -30,7 +30,9 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	private long startTime;
 	public boolean finished;
 
-	protected BlockingDeque<PeerEvent<? extends EventPayload>> eventQueue;
+	Boolean isRunning;
+	protected BlockingDeque<Callable<Void>> runQueue;
+	// protected BlockingDeque<PeerEvent<? extends EventPayload>> eventQueue;
 	protected List<Peer> connectedPeers;
 	protected List<Peer> attemptingToConnectPeers;
 	protected Bitfield localBitfield;
@@ -42,7 +44,15 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	}
 	public void shutdown() {
 		try {
-			eventQueue.putFirst(new PeerEvent<EventPayload>(PeerEvent.Type.SHUTDOWN));
+			// eventQueue.putFirst(new PeerEvent<EventPayload>(PeerEvent.Type.SHUTDOWN));
+			runQueue.putFirst(new Callable<Void>() {
+				public Void call() {
+					disconnectPeers();
+					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STOPPED);
+					isRunning = false;
+					return null;
+				}
+			});
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -94,7 +104,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		size = info.file_length;
 		tracker = new Tracker(escaped_info_hash, info.announce_url.toString(), size);
 		fileWriter = new Writer(saveFileName, info.piece_length);
-		eventQueue = new LinkedBlockingDeque<>();
+		// eventQueue = new LinkedBlockingDeque<>();
 		connectedPeers = new ArrayList<>();
 		attemptingToConnectPeers = new ArrayList<>();
 		piecesToDownload = new ArrayDeque<>(info.piece_hashes.length);
@@ -121,6 +131,9 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 
 		if (piecesToDownload.peek() == null)
 			finished = true;
+
+		isRunning = true;
+		runQueue = new LinkedBlockingDeque<>();
 	}
    
    public void createIncomingPeer(Handshake peer_hs, Socket sock){
@@ -218,9 +231,15 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	 * @param  message the MessageData object containing information about the message
 	 * @return         true if peer should continue reading, false if not
 	 */
-	public void peerDidReceiveMessage(Peer peer, MessageData message) {
+	public void peerDidReceiveMessage(final Peer peer, final MessageData message) {
 		try {
-			eventQueue.putLast(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_RECEIVED, peer, message));
+			// eventQueue.putLast(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_RECEIVED, peer, message));
+			runQueue.putLast(new Callable<Void>() {
+				public Void call() {
+					processMessageEvent(peer, message);
+					return null;
+				}
+			});
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -367,34 +386,37 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	 * @param peerIsLegit true if the handshake was correct,
 	 *                    false if handshake was incorrect
 	 */
-	public void peerDidHandshake(Peer peer, Boolean peerIsLegit) {
-		PeerEvent.Type eventType;
-		if (peerIsLegit) {
-			eventType = PeerEvent.Type.HANDSHAKE_SUCCESSFUL;
-		} else {
-			eventType = PeerEvent.Type.HANDSHAKE_FAILED;
-		}
+	public void peerDidHandshake(final Peer peer, final Boolean peerIsLegit) {
 		try {
-			eventQueue.putLast(new PeerEvent<EventPayload>(eventType, peer));
+			runQueue.putLast(new Callable<Void>() {
+				public Void call() {
+					if (peerIsLegit) {
+						connectedPeers.add(peer);
+						attemptingToConnectPeers.remove(peer);
+					} else {
+						peer.shutdown();
+					}
+					return null;
+				}
+			});
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
-	public void peerDidInitiateConnection(Peer peer) {
+	public void peerDidInitiateConnection(final Peer peer) {
 		try {
-			eventQueue.putLast(new PeerEvent<EventPayload>(PeerEvent.Type.PEER_INITIATED_CONNECTION, peer));
+			runQueue.putLast(new Callable<Void>() {
+				public Void call() {
+					for (int i = 0; i < localBitfield.numBits; i++) {
+						System.out.println("sending have " + i + " to peer " + peer.ip);
+						peer.send(new MessageData(Message.HAVE, i));
+					}
+					return null;
+				}
+			});
 		} catch (Exception e) {
 			e.printStackTrace();
-		}
-	}
-
-	protected void processPeerInitiatedConnection(Peer peer) {
-		for (int i = 0; i < localBitfield.numBits; i++) {
-			if (localBitfield.get(i) == true) {
-				System.out.println("sending have " + i + " to peer " + peer.ip);
-				peer.send(new MessageData(Message.HAVE, i));
-			}
 		}
 	}
 
@@ -402,9 +424,16 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	 * Called by peer if it tried to connect but failed for any reason
 	 * @param peer peer that failed to create a connection
 	 */
-	public void peerDidFailToConnect(Peer peer) {
+	public void peerDidFailToConnect(final Peer peer) {
 		try {
-			eventQueue.putLast(new PeerEvent<EventPayload>(PeerEvent.Type.CONNECTION_FAILED, peer));
+			runQueue.putLast(new Callable<Void>() {
+				public Void call() {
+					System.err.println("Could not connect to peer " + peer.peer_id + " at ip: " + peer.ip);
+					peer.shutdown();
+					attemptingToConnectPeers.remove(peer);
+					return null;
+				}
+			});
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -419,30 +448,11 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	}
 
 
-	protected void consumeEvents() {
-		PeerEvent<? extends EventPayload> event = null;
-		Boolean isRunning = true;
+	protected void consumeRunQueue() {
+		Callable<Void> block = null;
 		try {
-			while(isRunning && (event = eventQueue.takeFirst()) != null) {
-				if (event.type == PeerEvent.Type.CONNECTION_FAILED) {
-					System.err.println("Could not connect to peer " + event.sender.peer_id + " at ip: " + event.sender.ip);
-					// can ask user what to do here
-				} else if (event.type == PeerEvent.Type.MESSAGE_RECEIVED && event.payload instanceof MessageData) {
-					processMessageEvent(event.sender, (MessageData)event.payload);
-				} else if (event.type == PeerEvent.Type.HANDSHAKE_SUCCESSFUL) {
-					connectedPeers.add(event.sender);
-					attemptingToConnectPeers.remove(event.sender);
-					System.out.println("Connected to peer: " + event.sender.ip);
-				} else if (event.type == PeerEvent.Type.HANDSHAKE_FAILED) {
-					System.err.println("handshake with peer " + event.sender.peer_id + " failed.");
-					event.sender.disconnect();
-				} else if (event.type == PeerEvent.Type.SHUTDOWN) {
-					disconnectPeers();
-					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STOPPED);
-					isRunning = false;
-				} else if (event.type == PeerEvent.Type.PEER_INITIATED_CONNECTION) {
-					processPeerInitiatedConnection(event.sender);
-				}
+			while (isRunning && (block = runQueue.takeFirst()) != null) {
+				block.call();
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -488,6 +498,6 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		} else {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
-		consumeEvents();
+		consumeRunQueue();
 	}
 }
