@@ -56,7 +56,7 @@ public class Peer {
 	 * @return           initialized Peer object
 	 */
 
-   public static Peer peerFromHandshake(Handshake peer_hs, Socket sock, DataInputStream in, PeerDelegate delegate){
+   public static Peer peerFromHandshake(Handshake peer_hs, Socket sock, PeerDelegate delegate){
       String ip = sock.getInetAddress().toString().substring(1);
       String peer_id = peer_hs.peer_id;
       int port = sock.getPort();
@@ -65,7 +65,7 @@ public class Peer {
 
       try {
          incomingPeer.sock = sock;
-         incomingPeer.input = in;
+         incomingPeer.input = new DataInputStream(sock.getInputStream());
          incomingPeer.output = new DataOutputStream(sock.getOutputStream());
          System.out.println("CClosed Socket: " + sock.isClosed());
          return incomingPeer;

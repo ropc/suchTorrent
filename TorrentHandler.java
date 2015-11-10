@@ -120,8 +120,8 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		}
 	}
    
-   public void createIncomingPeer(Handshake peer_hs, Socket sock, DataInputStream in){
-      Peer incPeer = Peer.peerFromHandshake(peer_hs, sock, in, this);
+   public void createIncomingPeer(Handshake peer_hs, Socket sock){
+      Peer incPeer = Peer.peerFromHandshake(peer_hs, sock, this);
       
       if (incPeer != null && !incPeer.sock.isClosed() && incPeer.sock.isConnected()){
          attemptingToConnectPeers.add(incPeer);

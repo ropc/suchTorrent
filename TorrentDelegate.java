@@ -10,6 +10,6 @@ public interface TorrentDelegate {
    public void shutdown();
    public void status();
    public ByteBuffer getHash();
-   public void createIncomingPeer(Handshake peer_hs, Socket sock, DataInputStream in);
+   public void createIncomingPeer(Handshake peer_hs, Socket sock);
 
 }
