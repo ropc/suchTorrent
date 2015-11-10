@@ -33,5 +33,6 @@ public class PeerEvent<T extends EventPayload> {
 		MESSAGE_TO_SEND,
 		SHUTDOWN,
 		UNCHOKED,
+		PEER_INITIATED_CONNECTION,
 	}
 }

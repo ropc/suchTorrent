@@ -19,8 +19,8 @@ public class RUBTClient {
 	public static String generatePeerId() {
 		char[] chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".toCharArray();
 		Random rando = new Random();
-		StringBuilder sb = new StringBuilder("-RU");
-		for (int i = 3; i < 20; i++) {
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < 20; i++) {
 			sb.append(chars[rando.nextInt(chars.length)]);
 		}
 		return sb.toString();	

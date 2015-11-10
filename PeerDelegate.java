@@ -35,4 +35,6 @@ public interface PeerDelegate {
 	public String getLocalPeerId();
 
 	public TorrentInfo getTorrentInfo();
+
+	public void peerDidInitiateConnection(Peer peer);
 }

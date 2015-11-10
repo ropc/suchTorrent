@@ -14,11 +14,11 @@ public abstract class PeerRunnable implements Runnable {
 		}
 
 		public void peerDidHandshake(Boolean peerIsLegit) {
-			if (peer == this.peer && peerIsLegit == true) {
-				WriteRunnable newWriteRunnable = new WriteRunnable(this.peer);
-				this.peer.writeThread = newWriteRunnable;
+			if (peerIsLegit == true) {
+				WriteRunnable newWriteRunnable = new WriteRunnable(peer);
+				peer.writeThread = newWriteRunnable;
 				(new Thread(newWriteRunnable)).start();
-				this.peer.startReading();
+				peer.startReading();
 			}
 		}
 	}
@@ -28,15 +28,13 @@ public abstract class PeerRunnable implements Runnable {
 
 		public HS_StartAndReadRunnable(Peer peerToManage, Handshake peer_hs) {
 			super(peerToManage);
+			peer.readThread = this;
 			hs = peer_hs;
 		}
 
 		@Override
 		public void run(){
-			// WriteRunnable newWriteRunnable = new WriteRunnable(this.peer);
-			// this.peer.writeThread = newWriteRunnable;
-			// (new Thread(newWriteRunnable)).start();
-			peer.start(hs); 
+			peer.start(hs);
 		}
 	}
 
@@ -50,7 +48,7 @@ public abstract class PeerRunnable implements Runnable {
 			writeQueue = new ArrayDeque<>();
 		}
 
-		public void run() { 
+		public void run() {
 			running = true;
 			try {
 				while (running == true) {
@@ -58,7 +56,7 @@ public abstract class PeerRunnable implements Runnable {
 					if (event != null) {
 						if (event.type == PeerEvent.Type.MESSAGE_TO_SEND && event.payload instanceof MessageData) {
 							MessageData message = (MessageData)event.payload;
-							if (message.type == Message.REQUEST || message.type == Message.PIECE)
+							if (message.type == Message.REQUEST)
 								writeQueue.add(message);
 							else
 								peer.writeToSocket(message);

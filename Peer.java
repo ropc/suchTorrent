@@ -153,10 +153,9 @@ public class Peer {
 	 * @throws IOException if any errors occur, they will be thrown
 	 */
 	protected void writeToSocket(MessageData message) throws IOException {
-		if (output != null && message != null && message.message != null) {
-			output.write(message.message);
-			output.flush();
-		}
+		System.out.println("writing " + message.type + " to socket");
+		output.write(message.message);
+		output.flush();
 	}
 
 	public void send(MessageData message) {
@@ -307,6 +306,7 @@ public class Peer {
 
 		if (legit) {
 			delegate.peerDidHandshake(this, legit);
+			delegate.peerDidInitiateConnection(this);
 			if (readThread != null)
 				readThread.peerDidHandshake(legit);
 		}
