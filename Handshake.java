@@ -1,6 +1,7 @@
 /**
  *Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
  */
+import java.io.*;
 import java.nio.*;
 import java.util.*;
 import GivenTools.*;
@@ -115,5 +116,14 @@ public class Handshake {
 												1 + protocol_length + 8 + 20,
 												1 + protocol_length + 8 + 20 + 20));
 		return new Handshake(info_hash, peer_id, protocol_str, handshake);
+	}
+
+	public static Handshake readInHandshake(DataInput in) throws IOException, EOFException {
+		byte pstrlen = in.readByte();
+		int handshakeLength = (int)pstrlen + 49;
+		byte[] handshakeBytes = new byte[handshakeLength];
+		handshakeBytes[0] = pstrlen;
+		in.readFully(handshakeBytes, 1, handshakeBytes.length - 1);
+		return decode(handshakeBytes);
 	}
 }
