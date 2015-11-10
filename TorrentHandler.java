@@ -32,7 +32,6 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 
 	Boolean isRunning;
 	protected BlockingDeque<Callable<Void>> runQueue;
-	// protected BlockingDeque<PeerEvent<? extends EventPayload>> eventQueue;
 	protected List<Peer> connectedPeers;
 	protected List<Peer> attemptingToConnectPeers;
 	protected Bitfield localBitfield;
@@ -44,7 +43,6 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	}
 	public void shutdown() {
 		try {
-			// eventQueue.putFirst(new PeerEvent<EventPayload>(PeerEvent.Type.SHUTDOWN));
 			runQueue.putFirst(new Callable<Void>() {
 				public Void call() {
 					disconnectPeers();
@@ -104,7 +102,6 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		size = info.file_length;
 		tracker = new Tracker(escaped_info_hash, info.announce_url.toString(), size);
 		fileWriter = new Writer(saveFileName, info.piece_length);
-		// eventQueue = new LinkedBlockingDeque<>();
 		connectedPeers = new ArrayList<>();
 		attemptingToConnectPeers = new ArrayList<>();
 		piecesToDownload = new ArrayDeque<>(info.piece_hashes.length);
@@ -233,7 +230,6 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	 */
 	public void peerDidReceiveMessage(final Peer peer, final MessageData message) {
 		try {
-			// eventQueue.putLast(new PeerEvent<MessageData>(PeerEvent.Type.MESSAGE_RECEIVED, peer, message));
 			runQueue.putLast(new Callable<Void>() {
 				public Void call() {
 					processMessageEvent(peer, message);
