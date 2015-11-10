@@ -3,6 +3,7 @@
  **/
 import java.nio.ByteBuffer;
 import java.net.Socket;
+import java.io.DataInputStream;
 
 public interface TorrentDelegate {
 

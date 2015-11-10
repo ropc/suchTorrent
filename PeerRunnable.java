@@ -14,36 +14,30 @@ public abstract class PeerRunnable implements Runnable {
 		}
 
 		public void peerDidHandshake(Boolean peerIsLegit) {
-			if (peer == this.peer && peerIsLegit == true) {
-				WriteRunnable newWriteRunnable = new WriteRunnable(this.peer);
-				this.peer.writeThread = newWriteRunnable;
+			if (peerIsLegit == true) {
+				WriteRunnable newWriteRunnable = new WriteRunnable(peer);
+				peer.writeThread = newWriteRunnable;
 				(new Thread(newWriteRunnable)).start();
-				this.peer.startReading();
+				peer.startReading();
 			}
 		}
 	}
-   
-   public static class HS_StartAndReadRunnable extends PeerRunnable {
-      protected Handshake hs;
+
+	public static class HS_StartAndReadRunnable extends StartAndReadRunnable {
+		protected Handshake hs;
 
 		public HS_StartAndReadRunnable(Peer peerToManage, Handshake peer_hs) {
-			peer = peerToManage;
-         hs = peer_hs;
+			super(peerToManage);
+			peer.readThread = this;
+			hs = peer_hs;
 		}
 
-      public void run(){
-         run (hs);
-      }
-         
+		@Override
+		public void run(){
+			peer.start(hs);
+		}
+	}
 
-      public void run(Handshake hs){
-         WriteRunnable newWriteRunnable = new WriteRunnable(this.peer);
-         this.peer.writeThread = newWriteRunnable;
-         (new Thread(newWriteRunnable)).start();
-         peer.start(hs); 
-      }
-
-   }
 	public static class WriteRunnable extends PeerRunnable {
 		private Boolean running;
 		private Queue<MessageData> writeQueue;
@@ -54,7 +48,7 @@ public abstract class PeerRunnable implements Runnable {
 			writeQueue = new ArrayDeque<>();
 		}
 
-		public void run() { 
+		public void run() {
 			running = true;
 			try {
 				while (running == true) {
@@ -62,7 +56,7 @@ public abstract class PeerRunnable implements Runnable {
 					if (event != null) {
 						if (event.type == PeerEvent.Type.MESSAGE_TO_SEND && event.payload instanceof MessageData) {
 							MessageData message = (MessageData)event.payload;
-							if (message.type == Message.REQUEST || message.type == Message.PIECE)
+							if (message.type == Message.REQUEST)
 								writeQueue.add(message);
 							else
 								peer.writeToSocket(message);
