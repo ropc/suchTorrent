@@ -56,7 +56,7 @@ public class Peer {
 	 * @return           initialized Peer object
 	 */
 
-   public static Peer peerFromHandshake(Handshake peer_hs, Socket sock, PeerDelegate delegate){
+   public static Peer peerFromHandshake(Handshake peer_hs, Socket sock, DataInputStream in, PeerDelegate delegate){
       String ip = sock.getInetAddress().toString().substring(1);
       String peer_id = peer_hs.peer_id;
       int port = sock.getPort();
@@ -65,9 +65,9 @@ public class Peer {
 
       try {
          incomingPeer.sock = sock;
-         incomingPeer.input = new DataInputStream(sock.getInputStream());
+         incomingPeer.input = in;
          incomingPeer.output = new DataOutputStream(sock.getOutputStream());
-         
+         System.out.println("CClosed Socket: " + sock.isClosed());
          return incomingPeer;
       }
       catch(Exception e){
@@ -119,6 +119,7 @@ public class Peer {
 	 * for this peer
 	 */
 	protected void disconnect() {
+		System.out.println("disconnect was called");
 		if (input != null) {
 			try {
 				input.close();
@@ -288,27 +289,28 @@ public class Peer {
 		}
 	}
 
-   public void handshake(Handshake peer_hs){
-      Handshake localHandshake = new Handshake(delegate.getTorrentInfo(), RUBTClient.peerId);
-      
-      Boolean legit = false;
-      if (localHandshake.info_hash.compareTo(peer_hs.info_hash) == 0){
-         legit = true;
-         try{
-            output.write(localHandshake.array);
-            output.flush();
+	public void handshake(Handshake peer_hs){
+		Handshake localHandshake = new Handshake(delegate.getTorrentInfo(), RUBTClient.peerId);
 
-            if (legit){
-               delegate.peerDidHandshake(this, legit);
-               if (readThread != null)
-                  readThread.peerDidHandshake(legit);
-            }
-         }
-         catch (Exception e){
-            e.printStackTrace();
-         }
-      }
-   }
+		Boolean legit = false;
+		if (localHandshake.info_hash.compareTo(peer_hs.info_hash) == 0){
+			legit = true;
+			try{
+				System.out.println("HClosed Socket: " + sock.isClosed());
+				output.write(localHandshake.array);
+				output.flush();
+		 	}
+			catch (Exception e){
+				e.printStackTrace();
+			}
+		}
+
+		if (legit) {
+			delegate.peerDidHandshake(this, legit);
+			if (readThread != null)
+				readThread.peerDidHandshake(legit);
+		}
+	}
 
 	/**
 	 * getters/setters for choking/interested

@@ -33,13 +33,9 @@ public abstract class PeerRunnable implements Runnable {
 
 		@Override
 		public void run(){
-			run(hs);
-		}
-
-		public void run(Handshake hs){
-			WriteRunnable newWriteRunnable = new WriteRunnable(this.peer);
-			this.peer.writeThread = newWriteRunnable;
-			(new Thread(newWriteRunnable)).start();
+			// WriteRunnable newWriteRunnable = new WriteRunnable(this.peer);
+			// this.peer.writeThread = newWriteRunnable;
+			// (new Thread(newWriteRunnable)).start();
 			peer.start(hs); 
 		}
 	}

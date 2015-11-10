@@ -47,28 +47,28 @@ public final class ListenServer implements Runnable{
       while(isActive){
          System.out.println("Waiting for connection...");
          
-         try(Socket sock = listenSocket.accept()){
+         try {
+            Socket sock = listenSocket.accept();
             System.out.println("Got incoming connection from " + sock.getInetAddress().toString() + " on port " + sock.getPort());
-            try (DataInputStream in = new DataInputStream(sock.getInputStream())){
-               byte pstrlen = in.readByte();
-               int length = (int)pstrlen + 49;
-               byte[] peer_bytes = new byte[length];
-               peer_bytes[0] = pstrlen;
-               in.readFully(peer_bytes, 1, length - 1);
-               hs = Handshake.decode(peer_bytes);
+            try {
+               DataInputStream in = new DataInputStream(sock.getInputStream());
+               // byte pstrlen = in.readByte();
+               // int length = (int)pstrlen + 49;
+               // byte[] peer_bytes = new byte[length];
+               // peer_bytes[0] = pstrlen;
+               // in.readFully(peer_bytes, 1, length - 1);
+               hs = Handshake.readInHandshake(in);
               
                if (torrentMap.containsKey(hs.info_hash)){
                   TorrentDelegate torr = torrentMap.get(hs.info_hash);
                   System.out.print("Found peer: " + hs.peer_id + " for torrent with hash: ");
-                  for(int j = 0; j < 20; j++){
-                     System.out.print(hs.info_hash.get(j));
-                  }
+                  for(byte b : hs.info_hash.array())
+                     System.out.print(b + " ");
                   System.out.println();
                   // in.close();
-                  torr.createIncomingPeer(hs, sock);
+                  torr.createIncomingPeer(hs, sock, in);
 
-               }
-               else{
+               } else {
                   System.err.println("Peer connected with unknown info-hash!");
                }         
             }

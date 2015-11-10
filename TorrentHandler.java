@@ -120,11 +120,11 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		}
 	}
    
-   public void createIncomingPeer(Handshake peer_hs, Socket sock){
-      Peer incPeer = Peer.peerFromHandshake( peer_hs, sock, this);
+   public void createIncomingPeer(Handshake peer_hs, Socket sock, DataInputStream in){
+      Peer incPeer = Peer.peerFromHandshake(peer_hs, sock, in, this);
       
       if (incPeer != null && !incPeer.sock.isClosed() && incPeer.sock.isConnected()){
-         connectedPeers.add(incPeer);
+         attemptingToConnectPeers.add(incPeer);
          PeerRunnable.HS_StartAndReadRunnable runnable = new PeerRunnable.HS_StartAndReadRunnable(incPeer, peer_hs);
          (new Thread(runnable)).start();     
       }
@@ -268,7 +268,10 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 				// System.out.println("sending request for piece 0 to " + peer.ip);
 				// peer.send(requestMsg);
 				System.out.println("notifying tracker will start to download");
-				tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STARTED);
+				if (downloaded != size)
+					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STARTED);
+				else
+					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
 			} else if (message.type == Message.PIECE) {
 				processPieceMessage(peer, message);
 			} else if (message.type == Message.REQUEST) {
@@ -413,7 +416,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 					event.sender.disconnect();
 				} else if (event.type == PeerEvent.Type.SHUTDOWN) {
 					disconnectPeers();
-					tracker.sendStoppedMessage();
+					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STOPPED);
 					isRunning = false;
 				}
 			}
@@ -429,7 +432,12 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	 */
 	@SuppressWarnings("unchecked")
 	public void run() {
-		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded);
+		Tracker.MessageType event;
+		if (size == downloaded)
+			event = Tracker.MessageType.STARTED;
+		else
+			event = Tracker.MessageType.UNDEFINED;
+		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded, event);
 		ToolKit.print(decodedData);
 		if (decodedData != null) {
 			Object value = decodedData.get(Tracker.KEY_PEERS);
@@ -440,7 +448,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 					ByteBuffer ip = (ByteBuffer)map_peer.get(Tracker.KEY_IP);
 					if (ip != null) {
 						String new_peer_ip = new String(ip.array());
-						if (new_peer_ip.compareTo("128.6.171.130") == 0 ||
+						if (new_peer_ip.compareTo("73.10.41.66") == 0 ||
 							new_peer_ip.compareTo("128.6.171.131") == 0)
 						{
 							// establish a connection with this peer
