@@ -30,7 +30,8 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	private long startTime;
 	public boolean finished;
 
-	Boolean isRunning;
+	boolean isRunning;
+	boolean didStart = false;
 	private BlockingDeque<Callable<Void>> runQueue;
 	protected List<Peer> connectedPeers;
 	protected List<Peer> attemptingToConnectPeers;
@@ -113,11 +114,11 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		if (all_pieces.length != info.piece_hashes.length)
 			all_pieces = new byte[info.piece_hashes.length][info.piece_length];
 		localBitfield = Bitfield.decode(sessionHandler.loadSession(), info.piece_hashes.length);
-		System.out.println("local bitfield: " + localBitfield);
 		if (localBitfield == null) {
 			System.out.println("bitfield that was read in is null");
 			localBitfield = new Bitfield(info.piece_hashes.length);
 		}
+		System.out.println("local bitfield: " + localBitfield);
 
 		for (int i = 0; i < info.piece_hashes.length; i++) {
 			if (localBitfield.get(i) == true)
@@ -134,16 +135,16 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	}
    
    public void createIncomingPeer(Handshake peer_hs, Socket sock){
-      Peer incPeer = Peer.peerFromHandshake(peer_hs, sock, this);
-      
-      if (incPeer != null && !incPeer.sock.isClosed() && incPeer.sock.isConnected()){
-         attemptingToConnectPeers.add(incPeer);
-         PeerRunnable.HS_StartAndReadRunnable runnable = new PeerRunnable.HS_StartAndReadRunnable(incPeer, peer_hs);
-         (new Thread(runnable)).start();     
-      }
-      else{
-         System.err.println("Something fucked up, socket is closed on incPeer");
-      }
+	  Peer incPeer = Peer.peerFromHandshake(peer_hs, sock, this);
+	  
+	  if (incPeer != null && !incPeer.sock.isClosed() && incPeer.sock.isConnected()){
+		 attemptingToConnectPeers.add(incPeer);
+		 PeerRunnable.HS_StartAndReadRunnable runnable = new PeerRunnable.HS_StartAndReadRunnable(incPeer, peer_hs);
+		 (new Thread(runnable)).start();     
+	  }
+	  else{
+		 System.err.println("Something fucked up, socket is closed on incPeer");
+	  }
    }
 
 
@@ -155,20 +156,26 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	 * @return              true if hashes match, false otherwise
 	 */
 	
-   protected Boolean pieceIsCorrect(MessageData pieceMessage) {
-		Boolean isCorrect = false;
+	protected boolean pieceIsCorrect(MessageData pieceMessage) {
 		if (pieceMessage.type == Message.PIECE) {
-			try {
-				MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
-				sha1.update(pieceMessage.message, 13, pieceMessage.message.length - 13);
-				byte[] generatedPieceHash = sha1.digest();
-				byte[] torrentFilePieceHash = info.piece_hashes[pieceMessage.pieceIndex].array();
-				if (Arrays.equals(generatedPieceHash, torrentFilePieceHash)) {
-					isCorrect = true;
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
+			return pieceIsCorrect(pieceMessage.pieceIndex, pieceMessage.block);
+		} else {
+			return false;
+		}
+	}
+
+	protected boolean pieceIsCorrect(int pieceIndex, byte[] block) {
+		boolean isCorrect = false;
+		try {
+			MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
+			sha1.update(block, 0, block.length);
+			byte[] generatedPieceHash = sha1.digest();
+			byte[] torrentFilePieceHash = info.piece_hashes[pieceIndex].array();
+			if (Arrays.equals(generatedPieceHash, torrentFilePieceHash)) {
+				isCorrect = true;
 			}
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 		return isCorrect;
 	}
@@ -372,6 +379,111 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			peer.shutdown();
 		}
 		attemptingToConnectPeers.clear();
+	}
+
+	public void requestNextPiece(final Peer peer) {
+		Integer pieceToRequest = piecesToDownload.poll();
+		if (pieceToRequest == null) {
+			pieceToRequest = requestedPieces.poll();
+		}
+		if (pieceToRequest != null) {
+			int pieceIndex = pieceToRequest.intValue();
+			int pieceSize = getPieceSize(pieceIndex);
+			System.out.println("sending REQUEST to " + peer.ip);
+			peer.send(new MessageData(Message.REQUEST, pieceIndex, 0, pieceSize));
+			requestedPieces.add(pieceIndex);
+		}
+	}
+
+	public void peerDidReceiveChoke(final Peer peer) { }
+
+	public void peerDidReceiveUnChoke(final Peer peer) {
+		try {
+			runQueue.putLast(new Callable<Void>() {
+				public Void call() {
+					if (didStart == false) {
+						if (downloaded != size)
+							tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STARTED);
+						else
+							tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
+					}
+					requestNextPiece(peer);
+					return null;
+				}
+			});
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void peerDidReceiveInterested(final Peer peer) {
+		try {
+			runQueue.putLast(new Callable<Void>() {
+				public Void call() {
+					peer.send(new MessageData(Message.UNCHOKE));
+					return null;
+				}
+			});
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void peerDidReceiveNotInterested(final Peer peer) { }
+
+	public void peerDidReceiveHave(final Peer peer, final int pieceIndex) {
+		// update rarest piece
+	}
+
+	public void peerDidReceiveBitfield(final Peer peer, final Bitfield bitfield) {
+		// + update rarest piece too
+		peer.send(new MessageData(Message.INTERESTED));
+	}
+
+	public void peerDidReceiveRequest(final Peer peer, final int index, final int begin, final int length) {
+		if (getLocalBitfield().get(index) == true) {
+			// can then find piece in memory or let TorrentHandler
+			// processs the request... the following does the former
+			byte[] block = new byte[length];
+			System.arraycopy(all_pieces[index], begin, block, 0, length);
+			MessageData msg = new MessageData(Message.PIECE, index, begin, block);
+			peer.send(msg);
+		}
+	}
+
+	public void peerDidReceivePiece(final Peer peer, final int index, final int begin, final byte[] block) {
+		requestNextPiece(peer);
+		try {
+			runQueue.putLast(new Callable<Void>() {
+				public Void call() {
+					if (pieceIsCorrect(index, block)) {
+						if (localBitfield.get(index) == false) {
+							saveTofile(new MessageData(Message.PIECE, index, begin, block));
+							all_pieces[index] = block;
+							localBitfield.set(index);
+							try {
+								sessionHandler.writeSession(localBitfield.array);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+							downloaded += getPieceSize(index);
+							System.out.format("downloaded %d out of %d (%.2f %%) (processed piece %d of size %d)\n",
+								downloaded, info.file_length, 100.0 * (double)downloaded / info.file_length, index, getPieceSize(index));
+						}
+					} else {
+						piecesToDownload.add(index);
+					}
+					requestedPieces.remove(index);
+					return null;
+				}
+			});
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void peerDidReceiveCancel(final Peer peer, final int index, final int begin, final int length) {
+		// peer.cancel(index, begin, length);
 	}
 
 	/**
