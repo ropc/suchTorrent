@@ -31,7 +31,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	public boolean finished;
 
 	Boolean isRunning;
-	protected BlockingDeque<Callable<Void>> runQueue;
+	private BlockingDeque<Callable<Void>> runQueue;
 	protected List<Peer> connectedPeers;
 	protected List<Peer> attemptingToConnectPeers;
 	protected Bitfield localBitfield;
@@ -433,6 +433,10 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	public synchronized Bitfield getLocalBitfield() {
+		return localBitfield;
 	}
 
 	public String getLocalPeerId() {
