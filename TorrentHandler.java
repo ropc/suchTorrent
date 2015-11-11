@@ -56,7 +56,20 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	private synchronized void incrementDownloaded(int value) {
 		downloaded += value;
 		if (downloaded == size) {
+			int hours,minutes,seconds,extra;
+			long time = System.currentTimeMillis();
+			System.out.println("done downloading. notifying tracker.");
 			tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
+			finished = true;
+			// System.out.println("disconnecting from peer: " + peer.ip);
+			time -= startTime;
+			time /= 1000;
+			hours = (int)time/3600;
+			time = time%3600;
+			minutes = (int)time/60;
+			time = time%60;
+			seconds = (int)time;
+			System.out.println("Time Elapsed since started:"+hours+":"+minutes+":"+seconds);
 		}
 	}
 
@@ -249,147 +262,6 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		return pieceSize;
 	}
 
-	/**
-	 * this is called by the peer when a message is recieved
-	 * the return value indicates whether or not the peer should
-	 * continue trying to read from its socket
-	 * @param  peer    peer that sent this message
-	 * @param  message the MessageData object containing information about the message
-	 * @return         true if peer should continue reading, false if not
-	 */
-	public void peerDidReceiveMessage(final Peer peer, final MessageData message) {
-		try {
-			runQueue.putLast(new Callable<Void>() {
-				public Void call() {
-					processMessageEvent(peer, message);
-					return null;
-				}
-			});
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	protected void processPieceMessage(Peer sender, MessageData message) {
-		if (pieceIsCorrect(message)) {
-			MessageData requestMsg = new MessageData(Message.HAVE, message.pieceIndex);
-			sender.send(requestMsg);
-			System.out.println("sending HAVE piece " + message.pieceIndex + " to peer " + sender.ip);
-			requestedPieces.remove(message.pieceIndex);
-			if (localBitfield.get(message.pieceIndex) == false) {
-				all_pieces[message.pieceIndex] = message.block;
-				saveTofile(message);
-				localBitfield.set(message.pieceIndex);
-				try {
-					sessionHandler.writeSession(localBitfield.array);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-				incrementDownloaded(getPieceSize(message.pieceIndex));
-				// System.out.println("downloaded: " + downloaded + " out of " + info.file_length + " (" + ((double)downloaded / info.file_length) + ")");
-				// System.out.println("downloaded piece " + message.pieceIndex + " of size " + getPieceSize(message.pieceIndex));
-				System.out.format("downloaded %d out of %d (%.2f %%) (processed piece %d of size %d)\n",
-					getDownloaded(), info.file_length, 100.0 * (double)getDownloaded() / info.file_length,
-					message.pieceIndex, getPieceSize(message.pieceIndex));
-			}
-			// nextPiece = message.pieceIndex + 1;
-			// addDownloaded(getPieceSize(message.pieceIndex));
-			// System.out.println("downloaded: " + downloaded + " picece size: " + getPieceSize(message.pieceIndex));
-		} else {
-			System.out.println("piece " + message.pieceIndex + " was incorrect.");
-			piecesToDownload.add(message.pieceIndex);
-		}
-	}
-
-	protected void processMessageEvent(Peer peer, MessageData message) {
-		// Peer peer = messageEvent.sender;
-		// MessageData message = messageEvent.payload;
-		try {
-			System.out.println("Processing message " + message.type + " from " + peer.ip);
-			if (message.type == Message.BITFIELD) {
-				MessageData requestMsg = new MessageData(Message.INTERESTED);
-				System.out.println("sending INTERESTED");
-				peer.send(requestMsg);
-			} else if (message.type == Message.UNCHOKE) {
-				// MessageData requestMsg = new MessageData(Message.REQUEST, 0, 0, info.piece_length);
-				// System.out.println("sending request for piece 0 to " + peer.ip);
-				// peer.send(requestMsg);
-				System.out.println("notifying tracker will start to download");
-				if (downloaded != size)
-					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STARTED);
-				else
-					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
-			} else if (message.type == Message.PIECE) {
-				processPieceMessage(peer, message);
-			} else if (message.type == Message.REQUEST) {
-				if (localBitfield.get(message.pieceIndex) == true) {
-					if (all_pieces[message.pieceIndex] != null){
-						byte[] block = new byte[message.blckLength];
-						System.arraycopy(all_pieces[message.pieceIndex], message.beginIndex, block, 0, message.blckLength);
-						MessageData msg = new MessageData(Message.PIECE, message.pieceIndex, message.beginIndex, block);
-						System.out.println("sending piece " + message.pieceIndex + " to peer " + peer.ip);
-						peer.send(msg);
-						uploaded += msg.block.length;
-					}
-					else
-						System.err.println("Need to be reading from the file here");
-				}
-				// else
-				// 	Do we want to deal with the case where the peer asks us for things we don't have
-			} else if (message.type == Message.INTERESTED) {
-				peer.send(new MessageData(Message.UNCHOKE));
-			}
-			
-			if (!finished) {
-				Integer nextPiece = piecesToDownload.poll();
-				if (nextPiece == null) {
-					nextPiece = requestedPieces.poll();
-					System.out.println("Greddily requesting " + nextPiece);
-				}
-
-				if (nextPiece != null) {
-					int nextPieceIndex = nextPiece.intValue();
-					if (peer.getBitfield().get(nextPieceIndex) == true) {
-						int pieceSize = getPieceSize(nextPieceIndex);
-						System.out.println("sending request for piece " + nextPieceIndex + " to: " + peer.ip);
-						MessageData requestMsg = new MessageData(Message.REQUEST, nextPieceIndex, 0, pieceSize);
-						peer.send(requestMsg);
-						requestedPieces.add(nextPieceIndex);
-					} else {
-						piecesToDownload.add(nextPieceIndex);
-					}
-				}
-
-				if (downloaded == info.file_length) {
-					// This might be getting sent early
-					int hours,minutes,seconds,extra;
-					long time = System.currentTimeMillis();
-					System.out.println("done downloading. notifying tracker.");
-					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
-					finished=true;
-					// System.out.println("disconnecting from peer: " + peer.ip);
-					time -= startTime;
-					time /= 1000;
-					hours = (int)time/3600;
-					time = time%3600;
-					minutes = (int)time/60;
-					time= time%60;
-					seconds = (int)time;
-					System.out.println("Time Elapsed since started:"+hours+":"+minutes+":"+seconds);
-					disconnectPeers();
-					// should send them an event instead
-					// peer.disconnect();
-					// saveTofile();
-				}
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.err.println("notifying tracker that download will stop");
-			tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STOPPED);
-			System.err.println("TODO: send an event to close the connection");
-		}
-	}
-
 	protected void disconnectPeers() {
 		for (Peer peer : connectedPeers) {
 			System.out.println("shutting down peer " + peer.ip);
@@ -485,7 +357,6 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	}
 
 	public void peerDidReceivePiece(final Peer peer, final int index, final int begin, final byte[] block) {
-		requestNextPiece(peer);
 		try {
 			runQueue.putLast(new Callable<Void>() {
 				public Void call() {
@@ -513,6 +384,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		requestNextPiece(peer);
 	}
 
 	public void peerDidReceiveCancel(final Peer peer, final int index, final int begin, final int length) {
@@ -550,8 +422,10 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			runQueue.putLast(new Callable<Void>() {
 				public Void call() {
 					for (int i = 0; i < localBitfield.numBits; i++) {
-						System.out.println("sending have " + i + " to peer " + peer.ip);
-						peer.send(new MessageData(Message.HAVE, i));
+						if (localBitfield.get(i) == true) {
+							System.out.println("sending have " + i + " to peer " + peer.ip);
+							peer.send(new MessageData(Message.HAVE, i));
+						}
 					}
 					return null;
 				}

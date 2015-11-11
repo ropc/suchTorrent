@@ -5,7 +5,7 @@ Phase 2
 -------
 
 - ~~upload~~
-- ime download
+- ~~time download~~
 - ~~contact tracker with STOPPED when client exits~~
 
 Phase 3
