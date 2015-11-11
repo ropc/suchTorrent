@@ -20,9 +20,9 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	public Tracker tracker;
 	public final String escaped_info_hash;
 	protected String local_peer_id;
-	public int uploaded;
-	public int downloaded;
-	public int size;
+	private int uploaded;
+	private int downloaded;
+	public final int size;
 	public int listenPort;
 	public Writer fileWriter;
 	protected SessionHandler sessionHandler;
@@ -36,8 +36,8 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	protected List<Peer> connectedPeers;
 	protected List<Peer> attemptingToConnectPeers;
 	protected Bitfield localBitfield;
-	protected Queue<Integer> piecesToDownload;
-	protected Queue<Integer> requestedPieces;
+	private Queue<Integer> piecesToDownload;
+	private Queue<Integer> requestedPieces;
 
 	public ByteBuffer getHash() {
 		return info.info_hash;
@@ -49,6 +49,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 					disconnectPeers();
 					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STOPPED);
 					isRunning = false;
+					System.out.println("stopping torrent handler thread");
 					return null;
 				}
 			});
@@ -381,7 +382,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		attemptingToConnectPeers.clear();
 	}
 
-	public void requestNextPiece(final Peer peer) {
+	public synchronized void requestNextPiece(final Peer peer) {
 		Integer pieceToRequest = piecesToDownload.poll();
 		if (pieceToRequest == null) {
 			pieceToRequest = requestedPieces.poll();
@@ -389,9 +390,17 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		if (pieceToRequest != null) {
 			int pieceIndex = pieceToRequest.intValue();
 			int pieceSize = getPieceSize(pieceIndex);
-			System.out.println("sending REQUEST to " + peer.ip);
-			peer.send(new MessageData(Message.REQUEST, pieceIndex, 0, pieceSize));
-			requestedPieces.add(pieceIndex);
+			if (peer.getBitfield().get(pieceIndex) == true) {
+				System.out.println("sending REQUEST " + pieceIndex + " to " + peer.ip);
+				peer.send(new MessageData(Message.REQUEST, pieceIndex, 0, pieceSize));
+				requestedPieces.add(pieceIndex);
+			} else {
+				// At this point can either recursively call back on this,
+				// which may or may not cause an infinite loop if the peer
+				// has no pieces. Or can have some way of finding a Peer
+				// that does have the piece and request it to that Peer.
+				// Or can have some other way of finding a piece to request
+			}
 		}
 	}
 
@@ -447,6 +456,8 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			byte[] block = new byte[length];
 			System.arraycopy(all_pieces[index], begin, block, 0, length);
 			MessageData msg = new MessageData(Message.PIECE, index, begin, block);
+			System.out.format("Sending PIECE index: %d, begin: %d, length: %d to peer %s\n",
+				index, begin, length, peer.ip);
 			peer.send(msg);
 		}
 	}
@@ -548,7 +559,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	}
 
 	public synchronized Bitfield getLocalBitfield() {
-		return localBitfield;
+		return localBitfield.clone();
 	}
 
 	public String getLocalPeerId() {
