@@ -49,6 +49,7 @@ public abstract class PeerRunnable implements Runnable {
 		}
 
 		public void run() {
+			System.out.println("write thread running");
 			running = true;
 			try {
 				while (running == true) {
@@ -76,6 +77,7 @@ public abstract class PeerRunnable implements Runnable {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
+			System.out.println("write thread closing");
 		}
 	}
 }

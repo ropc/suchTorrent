@@ -1,7 +1,9 @@
 /**
  * Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
  */
-public class Bitfield {
+import java.util.Arrays;
+
+public class Bitfield implements Cloneable {
 	/**
 	 * The whole array is treated as one big-endianed sequence
 	 * of bits where the highest bit corresponds to bit 0.
@@ -88,6 +90,11 @@ public class Bitfield {
 			else
 				array[wantedByte] = (byte)(array[wantedByte] & (byte)(~mask));
 		}
+	}
+
+	@Override
+	public Bitfield clone() {
+		return new Bitfield(Arrays.copyOf(array, array.length), numBits);
 	}
 
 	/**

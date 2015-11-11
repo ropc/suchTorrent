@@ -203,25 +203,41 @@ public class Peer {
 				MessageData message = new MessageData(messageBuffer);
 				System.out.println("message " + message.type.toString() + " came in");
 				switch (message.type) {
-					case BITFIELD:
-						bitfield = Bitfield.decode(message.bitfield, delegate.getTorrentInfo().piece_hashes.length);
-						break;
-					case UNCHOKE:
-						setIsChocking(false);
-						break;
 					case CHOKE:
 						setIsChocking(true);
 						eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.UNCHOKED, this));
+						delegate.peerDidReceiveChoke(this);
+						break;
+					case UNCHOKE:
+						setIsChocking(false);
+						delegate.peerDidReceiveUnChoke(this);
 						break;
 					case INTERESTED:
 						setIsInterested(true);
+						delegate.peerDidReceiveInterested(this);
 						break;
 					case NOTINTERESTED:
 						setIsInterested(false);
+						delegate.peerDidReceiveNotInterested(this);
+						break;
+					case HAVE:
+						bitfield.set(message.pieceIndex);
+						delegate.peerDidReceiveHave(this, message.pieceIndex);
+						break;
+					case BITFIELD:
+						bitfield = Bitfield.decode(message.bitfield, delegate.getTorrentInfo().piece_hashes.length);
+						delegate.peerDidReceiveBitfield(this, bitfield);
+						break;
+					case REQUEST:
+						delegate.peerDidReceiveRequest(this, message.pieceIndex, message.beginIndex, message.blckLength);
+						break;
+					case PIECE:
+						delegate.peerDidReceivePiece(this, message.pieceIndex, message.beginIndex, message.block);
+						break;
+					case CANCEL:
+						delegate.peerDidReceiveCancel(this, message.pieceIndex, message.beginIndex, message.blckLength);
 						break;
 				}
-
-				delegate.peerDidReceiveMessage(this, message);
 			} catch (Exception e) {
 				if (getIsShuttingDown() == false)
 					e.printStackTrace();
@@ -377,6 +393,6 @@ public class Peer {
 	}
 
 	public Bitfield getBitfield() {
-		return bitfield;
+		return bitfield.clone();
 	}
 }
