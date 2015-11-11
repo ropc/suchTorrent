@@ -39,6 +39,27 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	private Queue<Integer> piecesToDownload;
 	private Queue<Integer> requestedPieces;
 
+	public synchronized int getUploaded() {
+		int newInt = uploaded;
+		return newInt;
+	}
+
+	private synchronized void incrementUploaded(int value) {
+		uploaded += value;
+	}
+
+	public synchronized int getDownloaded() {
+		int newInt = downloaded;
+		return downloaded;
+	}
+
+	private synchronized void incrementDownloaded(int value) {
+		downloaded += value;
+		if (downloaded == size) {
+			tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
+		}
+	}
+
 	public ByteBuffer getHash() {
 		return info.info_hash;
 	}
@@ -47,7 +68,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			runQueue.putFirst(new Callable<Void>() {
 				public Void call() {
 					disconnectPeers();
-					tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STOPPED);
+					tracker.getTrackerResponse(getUploaded(), getDownloaded(), Tracker.MessageType.STOPPED);
 					isRunning = false;
 					System.out.println("stopping torrent handler thread");
 					return null;
@@ -59,7 +80,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 
 	}
 	public void status(){
-		System.out.format("downloaded: %d, uploaded: %d\n", downloaded, uploaded);
+		System.out.format("downloaded: %d, uploaded: %d\n", getDownloaded(), getUploaded());
 	}
 
 
@@ -186,7 +207,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	 * if the the download is complete.
 	 */
 	protected void saveTofile() {
-		if (downloaded == info.file_length) {
+		if (getDownloaded() == info.file_length) {
 			int hours,minutes,seconds,extra;
 			long time = System.currentTimeMillis();
 			time -= startTime;
@@ -264,11 +285,11 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
-				downloaded = downloaded + getPieceSize(message.pieceIndex);
+				incrementDownloaded(getPieceSize(message.pieceIndex));
 				// System.out.println("downloaded: " + downloaded + " out of " + info.file_length + " (" + ((double)downloaded / info.file_length) + ")");
 				// System.out.println("downloaded piece " + message.pieceIndex + " of size " + getPieceSize(message.pieceIndex));
 				System.out.format("downloaded %d out of %d (%.2f %%) (processed piece %d of size %d)\n",
-					downloaded, info.file_length, 100.0 * (double)downloaded / info.file_length,
+					getDownloaded(), info.file_length, 100.0 * (double)getDownloaded() / info.file_length,
 					message.pieceIndex, getPieceSize(message.pieceIndex));
 			}
 			// nextPiece = message.pieceIndex + 1;
@@ -411,10 +432,11 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			runQueue.putLast(new Callable<Void>() {
 				public Void call() {
 					if (didStart == false) {
-						if (downloaded != size)
-							tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.STARTED);
+						if (getDownloaded() != size)
+							tracker.getTrackerResponse(getUploaded(), getDownloaded(), Tracker.MessageType.STARTED);
 						else
-							tracker.getTrackerResponse(uploaded, downloaded, Tracker.MessageType.COMPLETED);
+							tracker.getTrackerResponse(getUploaded(), getDownloaded(), Tracker.MessageType.COMPLETED);
+						didStart = true;
 					}
 					requestNextPiece(peer);
 					return null;
@@ -477,9 +499,9 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
-							downloaded += getPieceSize(index);
+							incrementDownloaded(getPieceSize(index));
 							System.out.format("downloaded %d out of %d (%.2f %%) (processed piece %d of size %d)\n",
-								downloaded, info.file_length, 100.0 * (double)downloaded / info.file_length, index, getPieceSize(index));
+								getDownloaded(), info.file_length, 100.0 * (double)getDownloaded() / info.file_length, index, getPieceSize(index));
 						}
 					} else {
 						piecesToDownload.add(index);
@@ -590,7 +612,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	@SuppressWarnings("unchecked")
 	public void run() {
 		Tracker.MessageType event;
-		if (size == downloaded)
+		if (size == getDownloaded())
 			event = Tracker.MessageType.STARTED;
 		else
 			event = Tracker.MessageType.UNDEFINED;
