@@ -238,8 +238,6 @@ public class Peer {
 						delegate.peerDidReceiveCancel(this, message.pieceIndex, message.beginIndex, message.blckLength);
 						break;
 				}
-
-				// delegate.peerDidReceiveMessage(this, message);
 			} catch (Exception e) {
 				if (getIsShuttingDown() == false)
 					e.printStackTrace();
@@ -395,6 +393,6 @@ public class Peer {
 	}
 
 	public Bitfield getBitfield() {
-		return bitfield;
+		return bitfield.clone();
 	}
 }
