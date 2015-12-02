@@ -73,30 +73,6 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		}
 	}
 
-	public ByteBuffer getHash() {
-		return info.info_hash;
-	}
-	public void shutdown() {
-		try {
-			runQueue.putFirst(new Callable<Void>() {
-				public Void call() {
-					disconnectPeers();
-					tracker.getTrackerResponse(getUploaded(), getDownloaded(), Tracker.MessageType.STOPPED);
-					isRunning = false;
-					System.out.println("stopping torrent handler thread");
-					return null;
-				}
-			});
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-	}
-	public void status(){
-		System.out.format("downloaded: %d, uploaded: %d\n", getDownloaded(), getUploaded());
-	}
-
-
 	/**
 	 * create attempts to create a TorrentHandler out of a
 	 * given torrent file name and save file name
@@ -170,20 +146,6 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		isRunning = true;
 		runQueue = new LinkedBlockingDeque<>();
 	}
-
-	public void createIncomingPeer(Handshake peer_hs, Socket sock){
-		Peer incPeer = Peer.peerFromHandshake(peer_hs, sock, this);
-
-		if (incPeer != null && !incPeer.sock.isClosed() && incPeer.sock.isConnected()){
-			attemptingToConnectPeers.add(incPeer);
-			PeerRunnable.HS_StartAndReadRunnable runnable = new PeerRunnable.HS_StartAndReadRunnable(incPeer, peer_hs);
-			(new Thread(runnable)).start();     
-		} else {
-			System.err.println("Something fucked up, socket is closed on incPeer");
-		}
-	}
-
-
 
    /**
 	 * Verifies the hash of a given piece inside a message
@@ -301,6 +263,95 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			}
 		}
 	}
+
+	/**
+	 * Possibly temporary helper for finding the number of
+	 * connected peers that have the given piece. These should
+	 * probably be cached somewhere else. returns Integer.MAX_VALUE
+	 * if no peers have it since java's priority queue is a min
+	 * heap and I want to put the pieces I have no information about
+	 * at the end of the queue (unattainable pieces)
+	 * @param  index the piece index
+	 * @return       value for the priority queue
+	 */
+	protected int getPeerCountForPiece(int index) {
+		int count = 0;
+		for (Peer peer : connectedPeers) {
+			if (peer.getBitfield().get(index) == true)
+				count++;
+		}
+		if (count == 0)
+			count = Integer.MAX_VALUE;
+		return count;
+	}
+
+	/**
+	 * Updates the piecesToDownload priority queue when new info
+	 * for a given piece comes in.
+	 * 
+	 * Oh man, this is cryptic. what's happening is that java
+	 * has no update key function so I have to remove and then re-add
+	 * the same thing to the priority queue with the new priority(key)
+	 * value. Since I don't know the number of peers that had that piece
+	 * beforehand, I am using only the piece index to remove it from the
+	 * queue. the updated priority value comes from getPeerCountForPiece()
+	 * 
+	 * @param index index of the piece that needs updating
+	 */
+	protected synchronized void updateRarestPiece(int index) {
+		PieceIndexCount piece = new PieceIndexCount(index, getPeerCountForPiece(index));
+		if (piecesToDownload.contains(piece)) {
+			piecesToDownload.remove(piece);
+			piecesToDownload.add(piece);
+		}
+	}
+
+
+	/**
+	 * TorrentDelegate interface methods
+	 */
+
+	public void shutdown() {
+		try {
+			runQueue.putFirst(new Callable<Void>() {
+				public Void call() {
+					disconnectPeers();
+					tracker.getTrackerResponse(getUploaded(), getDownloaded(), Tracker.MessageType.STOPPED);
+					isRunning = false;
+					System.out.println("stopping torrent handler thread");
+					return null;
+				}
+			});
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+	}
+
+	public void status(){
+		System.out.format("downloaded: %d, uploaded: %d\n", getDownloaded(), getUploaded());
+	}
+
+	public ByteBuffer getHash() {
+		return info.info_hash;
+	}
+
+	public void createIncomingPeer(Handshake peer_hs, Socket sock){
+		Peer incPeer = Peer.peerFromHandshake(peer_hs, sock, this);
+
+		if (incPeer != null && !incPeer.sock.isClosed() && incPeer.sock.isConnected()){
+			attemptingToConnectPeers.add(incPeer);
+			PeerRunnable.HS_StartAndReadRunnable runnable = new PeerRunnable.HS_StartAndReadRunnable(incPeer, peer_hs);
+			(new Thread(runnable)).start();     
+		} else {
+			System.err.println("Something fucked up, socket is closed on incPeer");
+		}
+	}
+
+
+	/**
+	 * "PeerDelegate" interface methods
+	 */
 
 	public void peerDidReceiveChoke(final Peer peer) { }
 
@@ -486,9 +537,10 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		}
 	}
 
-	public synchronized Bitfield getLocalBitfield() {
-		return localBitfield.clone();
-	}
+	/**
+	 * getters for useful info
+	 * the first two are also for the PeerDelegate interface
+	 */
 
 	public String getLocalPeerId() {
 		return local_peer_id;
@@ -498,59 +550,16 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		return info;
 	}
 
-
-	protected void consumeRunQueue() {
-		Callable<Void> block = null;
-		try {
-			while (isRunning && (block = runQueue.takeFirst()) != null) {
-				block.call();
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
 	/**
-	 * Possibly temporary helper for finding the number of
-	 * connected peers that have the given piece. These should
-	 * probably be cached somewhere else. returns Integer.MAX_VALUE
-	 * if no peers have it since java's priority queue is a min
-	 * heap and I want to put the pieces I have no information about
-	 * at the end of the queue (unattainable pieces)
-	 * @param  index the piece index
-	 * @return       value for the priority queue
+	 * get the local bitfield.
+	 * it will be a copy of the actual bitfield in order
+	 * to avoid writing outside the TorrentHandler's thread
+	 * @return a copy of the local bitfield
 	 */
-	protected int getPeerCountForPiece(int index) {
-		int count = 0;
-		for (Peer peer : connectedPeers) {
-			if (peer.getBitfield().get(index) == true)
-				count++;
-		}
-		if (count == 0)
-			count = Integer.MAX_VALUE;
-		return count;
+	public synchronized Bitfield getLocalBitfield() {
+		return localBitfield.clone();
 	}
 
-
-	/**
-	 * Updates the piecesToDownload priority queue when new info
-	 * for a given piece comes in.
-	 * 
-	 * Oh man, this is cryptic. what's happening is that java
-	 * has no update key function so I have to remove and then re-add
-	 * the same thing to the priority queue with the new priority(key)
-	 * value. Since I don't know the number of peers that had that piece
-	 * beforehand, I am using only the piece index to remove it from the
-	 * queue. the updated priority value comes from getPeerCountForPiece()
-	 * @param index index of the piece that needs updating
-	 */
-	protected synchronized void updateRarestPiece(int index) {
-		PieceIndexCount piece = new PieceIndexCount(index, getPeerCountForPiece(index));
-		if (piecesToDownload.contains(piece)) {
-			piecesToDownload.remove(piece);
-			piecesToDownload.add(piece);
-		}
-	}
 
 	/**
 	 * Start torrent handler. Which will communicate with the tracker
@@ -591,6 +600,16 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		} else {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
-		consumeRunQueue();
+		
+		// Now start consuming the queue, calling each object/
+		// block of code put in the queue
+		Callable<Void> block = null;
+		try {
+			while (isRunning && (block = runQueue.takeFirst()) != null) {
+				block.call();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }
