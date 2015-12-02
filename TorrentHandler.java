@@ -162,6 +162,17 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 				piecesToDownload.add(i);
 		}
 
+		System.out.println("starting test:");
+		Queue<PieceWithIndex> priority = new PriorityQueue<>(2, new PieceWithIndex.PiecePriorityComparator());
+		priority.add(new PieceWithIndex(0, 2));
+		priority.add(new PieceWithIndex(1, 3));
+		priority.add(new PieceWithIndex(2, 1));
+		priority.add(new PieceWithIndex(3, 2));
+		priority.add(new PieceWithIndex(4, 2));
+		System.out.println(priority);
+		priority.remove(new PieceWithIndex(0, 2));
+		System.out.println(priority);
+
 		if (piecesToDownload.peek() == null)
 			finished = true;
 
