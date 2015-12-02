@@ -544,7 +544,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	 * queue. the updated priority value comes from getPeerCountForPiece()
 	 * @param index index of the piece that needs updating
 	 */
-	protected void updateRarestPiece(int index) {
+	protected synchronized void updateRarestPiece(int index) {
 		PieceIndexCount piece = new PieceIndexCount(index, getPeerCountForPiece(index));
 		if (piecesToDownload.contains(piece)) {
 			piecesToDownload.remove(piece);
