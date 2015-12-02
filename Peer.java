@@ -393,6 +393,9 @@ public class Peer {
 	}
 
 	public Bitfield getBitfield() {
-		return bitfield.clone();
+		if (bitfield != null)
+			return bitfield.clone();
+		else
+			return new Bitfield(delegate.getTorrentInfo().piece_hashes.length);
 	}
 }

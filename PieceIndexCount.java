@@ -3,8 +3,8 @@
  */
 
 public class PieceIndexCount implements Comparable<PieceIndexCount> {
-	public final int index;
-	public final int peerCount;
+	public int index;
+	public int peerCount;
 
 	public PieceIndexCount(int index, int peerCount) {
 		this.index = index;
