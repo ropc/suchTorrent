@@ -162,7 +162,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 				piecesToDownload.add(new PieceIndexCount(i, Integer.MAX_VALUE));
 		}
 
-		System.out.println(piecesToDownload);
+		System.out.println("Pieces to download: " + piecesToDownload);
 
 		if (piecesToDownload.peek() == null)
 			finished = true;
@@ -341,12 +341,6 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 
 	public void peerDidReceiveHave(final Peer peer, final int pieceIndex) {
 		// update rarest piece
-		// Oh man, this is illegible. what's happening is that java
-		// has no update key function so I have to remove and then re-add
-		// the same thing to the priority queue with the new priority(key)
-		// value. Since I don't know the number of peers that had that piece
-		// beforehand, I am using only the piece index to remove it from the
-		// queue. the updated priority value comes from getPeerCountForPiece()
 		try {
 			runQueue.putLast(new Callable<Void>() {
 				public Void call() {
@@ -537,6 +531,19 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		return count;
 	}
 
+
+	/**
+	 * Updates the piecesToDownload priority queue when new info
+	 * for a given piece comes in.
+	 * 
+	 * Oh man, this is cryptic. what's happening is that java
+	 * has no update key function so I have to remove and then re-add
+	 * the same thing to the priority queue with the new priority(key)
+	 * value. Since I don't know the number of peers that had that piece
+	 * beforehand, I am using only the piece index to remove it from the
+	 * queue. the updated priority value comes from getPeerCountForPiece()
+	 * @param index index of the piece that needs updating
+	 */
 	protected void updateRarestPiece(int index) {
 		PieceIndexCount piece = new PieceIndexCount(index, getPeerCountForPiece(index));
 		if (piecesToDownload.contains(piece)) {
