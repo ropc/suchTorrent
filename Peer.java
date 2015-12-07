@@ -51,7 +51,7 @@ public class Peer {
 	 * create a Peer from a Handshake and a Socket opened
 	 * by our ServerListener thread
 	 * @param  peer_hs   Handshake received from peer.
-    * @param  sock      Socket opened by ServerSocket on accept().
+     * @param  sock      Socket opened by ServerSocket on accept().
 	 * @param  delegate  PeerDelegate that will handle events relating to the given peer
 	 * @return           initialized Peer object
 	 */
