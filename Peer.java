@@ -33,6 +33,19 @@ public class Peer {
 	public PeerRunnable.WriteRunnable writeThread;
 	private Boolean isShuttingDown;
 
+	@Override
+	public boolean equals(Object obj) {
+		if (obj == null)
+			return false;
+		if (this == obj)
+			return true;
+		if (!(obj instanceof Peer))
+            return false;
+		Peer other = (Peer)obj;
+		return (this.ip.equals(other.ip) &&
+			this.peer_id.equals(other.peer_id));
+	}
+
 	/**
 	 * create a Peer from a given HashMap that was decoded
 	 * from a Bencoded tracker response

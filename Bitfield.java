@@ -1,7 +1,7 @@
 /**
  * Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
  */
-import java.util.Arrays;
+import java.util.*;
 
 public class Bitfield implements Cloneable {
 	/**
@@ -143,6 +143,15 @@ public class Bitfield implements Cloneable {
 		} else {
 			return null;
 		}
+	}
+
+	public Set<Integer> getSetBitIndexes() {
+		Set<Integer> intSet = new HashSet<>();
+		for (int i = 0; i < numBits; i++) {
+			if (get(i) == true)
+				intSet.add(i);
+		}
+		return intSet;
 	}
 
 	/**
