@@ -575,7 +575,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			event = Tracker.MessageType.UNDEFINED;
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded, event);
 		ToolKit.print(decodedData);
-		if (decodedData != null) {
+		if (decodedData != null && !finished) {
 			Object value = decodedData.get(Tracker.KEY_PEERS);
 			ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)value;
 			// ToolKit.print(peers);
@@ -583,20 +583,22 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 				for (Map<ByteBuffer, Object> map_peer : peers) {
 					ByteBuffer ip = (ByteBuffer)map_peer.get(Tracker.KEY_IP);
 					if (ip != null) {
-						String new_peer_ip = new String(ip.array());
-						if (new_peer_ip.compareTo("128.6.171.130") == 0 ||
-							new_peer_ip.compareTo("128.6.171.131") == 0)
-						{
-							// establish a connection with this peer
-							Peer client = Peer.peerFromMap(map_peer, this);
-							attemptingToConnectPeers.add(client);
-							client.startThreads();
-						}
+						// String new_peer_ip = new String(ip.array());
+						// if (new_peer_ip.compareTo("128.6.171.130") == 0 ||
+						// 	new_peer_ip.compareTo("128.6.171.131") == 0)
+						// {
+						// }
+						// establish a connection with this peer
+						Peer client = Peer.peerFromMap(map_peer, this);
+						attemptingToConnectPeers.add(client);
+						client.startThreads();
 					}
 				}
 			} else {
 				System.err.println("Could not find key PEERS in decoded tracker response");
 			}
+		} else if (finished) {
+			System.out.println("Seeding.");
 		} else {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
