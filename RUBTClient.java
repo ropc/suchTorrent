@@ -6,6 +6,7 @@ import java.util.*;
 import java.nio.*;
 import GivenTools.*;
 import java.util.concurrent.*;
+import javax.swing.*;
 
 public class RUBTClient {
 
@@ -69,6 +70,24 @@ public class RUBTClient {
 			System.err.println("Client takes in exactly 2 arguments: TorrentFile, SaveFileName");
 			isReceivingInput = false;
 			server.shutdown();
+		}
+
+		
+		if (isReceivingInput == true) {
+			JFrame window = new JFrame();
+			window.setSize(400,500);
+			window.setLayout(null);
+			window.setVisible(true);
+			final JLabel percentDownload = new JLabel("0%");
+			percentDownload.setBounds(130,100,300, 40);
+			window.add(percentDownload);
+			myTorrent.addObserver(new Observer() {
+				@Override
+				public void update(Observable o, Object arg) {
+					String text = String.format("%.2f %% downloaded", ((Double)arg).doubleValue());
+					percentDownload.setText(text);
+				}
+			});
 		}
 
 		while (isReceivingInput && sc.hasNextLine()) {
