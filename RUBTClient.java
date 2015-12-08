@@ -31,6 +31,9 @@ public class RUBTClient {
 		return port;
 	}
 
+	final static JFrame window = new JFrame();
+	final static JLabel percentDownload = new JLabel("0%");
+
 	/**
 	 * main method for BitTorrent client.
 	 * creates a TorrentHandler object that will handle the download
@@ -74,12 +77,10 @@ public class RUBTClient {
 
 		
 		if (isReceivingInput == true) {
-			JFrame window = new JFrame();
-			window.setSize(400,500);
+			window.setSize(400, 500);
 			window.setLayout(null);
-			window.setVisible(true);
-			final JLabel percentDownload = new JLabel("0%");
-			percentDownload.setBounds(130,100,300, 40);
+			window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+			percentDownload.setBounds(130, 100, 300, 40);
 			window.add(percentDownload);
 			myTorrent.addObserver(new Observer() {
 				@Override
@@ -88,6 +89,7 @@ public class RUBTClient {
 					percentDownload.setText(text);
 				}
 			});
+			window.setVisible(true);
 		}
 
 		while (isReceivingInput && sc.hasNextLine()) {
