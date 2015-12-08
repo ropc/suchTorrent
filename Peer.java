@@ -119,7 +119,7 @@ public class Peer {
 	 * for this peer
 	 */
 	protected void disconnect() {
-		System.out.println("disconnect was called");
+		System.out.format("disconnect from %s was called\n", ip);
 		if (input != null) {
 			try {
 				input.close();
@@ -152,7 +152,7 @@ public class Peer {
 	 * @param  message     message to send
 	 * @throws IOException if any errors occur, they will be thrown
 	 */
-	protected void writeToSocket(MessageData message) throws IOException {
+	protected void writeToSocket(MessageData message) throws IOException, SocketException {
 		System.out.println("writing " + message.type + " to socket");
 		output.write(message.message);
 		output.flush();
@@ -238,6 +238,9 @@ public class Peer {
 						delegate.peerDidReceiveCancel(this, message.pieceIndex, message.beginIndex, message.blckLength);
 						break;
 				}
+			} catch (EOFException|SocketException e) {
+				isReading = false;
+				disconnect();
 			} catch (Exception e) {
 				if (getIsShuttingDown() == false)
 					e.printStackTrace();

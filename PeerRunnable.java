@@ -1,4 +1,5 @@
 import java.util.*;
+import java.net.SocketException;
 import java.util.concurrent.TimeUnit;
 
 public abstract class PeerRunnable implements Runnable {
@@ -74,6 +75,9 @@ public abstract class PeerRunnable implements Runnable {
 						}
 					}
 				}
+			} catch (SocketException e) {
+				running = false;
+				peer.disconnect();
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
