@@ -612,11 +612,10 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		@Override
 		public void run() {
 			try {
-				System.out.println("OPTIMISTIC UNCHOKING task running");
 				runQueue.putLast(new Callable<Void>() {
 					@Override
 					public Void call() {
-						System.out.println("OPTIMISTIC UNCHOKING queue task called");
+						System.out.println("OPTIMISTIC UNCHOKING task called");
 						boolean slowPeerChoked = false;
 						List<Map.Entry<String, Integer>> increasingDownloadPeers = odometer.poll();
 						for (Map.Entry<String, Integer> peerEntry : increasingDownloadPeers) {
@@ -698,7 +697,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
 
-		chokeTimer.scheduleAtFixedRate(optimisticUnchokeTask, 3000, 3000);
+		chokeTimer.scheduleAtFixedRate(optimisticUnchokeTask, 30000, 30000);
 
 		// Now start consuming the queue, calling each object/
 		// block of code put in the queue
