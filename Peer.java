@@ -33,6 +33,8 @@ public class Peer {
 	public PeerRunnable.WriteRunnable writeThread;
 	private Boolean isShuttingDown;
 
+	public static int connection_time_out = 1000;
+
 	@Override
 	public boolean equals(Object obj) {
 		if (obj == null)
@@ -105,7 +107,7 @@ public class Peer {
 		isInterested = false;
 		amChocking = true;
 		amInterested = false;
-		bitfield = null;
+		bitfield = new Bitfield(delegate.getTorrentInfo().piece_hashes.length);
 		eventQueue = new LinkedBlockingQueue<>();
 		isShuttingDown = false;
 	}
@@ -117,11 +119,14 @@ public class Peer {
 	 */
 	public void connect() {
 		try {
-			sock = new Socket(ip, port);
+			sock = new Socket();
+			sock.connect(new InetSocketAddress(ip, port), connection_time_out);
 			output = new DataOutputStream(sock.getOutputStream());
 			input = new DataInputStream(sock.getInputStream());
 		} catch (Exception e) {
-			e.printStackTrace();
+			if (!(e instanceof ConnectException))
+				e.printStackTrace();
+			shutdown();
 			delegate.peerDidFailToConnect(this);
 		}
 	}
@@ -137,7 +142,7 @@ public class Peer {
 			try {
 				input.close();
 			} catch (Exception e) {
-				if (isShuttingDown == false)
+				if (!isShuttingDown)
 					e.printStackTrace();
 			}
 		}
@@ -145,7 +150,7 @@ public class Peer {
 			try {
 				output.close();
 			} catch (Exception e) {
-				if (isShuttingDown == false)
+				if (!isShuttingDown)
 					e.printStackTrace();
 			}
 		}
@@ -153,10 +158,11 @@ public class Peer {
 			try {
 				sock.close();
 			} catch (Exception e) {
-				if (isShuttingDown == false)
+				if (!isShuttingDown)
 					e.printStackTrace();
 			}
 		}
+		delegate.peerDidDisconnect(this);
 	}
 
 	/**
@@ -251,14 +257,14 @@ public class Peer {
 						delegate.peerDidReceiveCancel(this, message.pieceIndex, message.beginIndex, message.blckLength);
 						break;
 				}
-			} catch (EOFException|SocketException e) {
-				isReading = false;
-				disconnect();
 			} catch (Exception e) {
-				if (getIsShuttingDown() == false)
+				if (!getIsShuttingDown() ||
+					(e instanceof EOFException) ||
+					(e instanceof SocketException)) {
 					e.printStackTrace();
+				}
 				isReading = false;
-				disconnect();
+				shutdown();
 			}
 		}
 	}
@@ -315,7 +321,9 @@ public class Peer {
 				if (readThread != null)
 					readThread.peerDidHandshake(peerIsLegit);
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (!(e instanceof SocketException) && !isShuttingDown)
+					e.printStackTrace();
+				shutdown();
 			}
 		}
 	}
@@ -333,6 +341,7 @@ public class Peer {
 		 	}
 			catch (Exception e){
 				e.printStackTrace();
+				shutdown();
 			}
 		}
 
@@ -409,9 +418,6 @@ public class Peer {
 	}
 
 	public Bitfield getBitfield() {
-		if (bitfield != null)
-			return bitfield.clone();
-		else
-			return new Bitfield(delegate.getTorrentInfo().piece_hashes.length);
+		return bitfield.clone();
 	}
 }
