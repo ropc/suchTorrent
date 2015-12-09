@@ -83,5 +83,6 @@ public class RUBTClient {
 		}
 		server.shutdown();
 		myTorrent.shutdown();
+		System.out.println("RUBTClient closing");
 	}
 }
