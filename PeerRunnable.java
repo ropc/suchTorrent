@@ -71,7 +71,7 @@ public abstract class PeerRunnable implements Runnable {
 						peer.writeToSocket(new MessageData(Message.KEEPALIVE));
 					}
 
-					if (peer.getIsChocking() == false) {
+					if (peer.getIsChoking() == false) {
 						for (MessageData msg = writeQueue.poll(); msg != null; msg = writeQueue.poll()) {
 							peer.writeToSocket(msg);
 						}

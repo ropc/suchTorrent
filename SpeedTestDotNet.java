@@ -1,36 +1,52 @@
 import java.util.Observable;
-import java.util.Timer;
+import java.util.Observer;
+import java.util.Collections;
 import java.util.TimerTask;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
 import java.util.HashMap;
 import java.util.SortedSet;
+import java.util.Comparator;
 
-public class SpeedTestDotNet extends Observable {
-   
-   public HashMap<String, int> deltaDownloaded;
-   public HashMap<String, int> deltaUploaded;
-   public Timer timer;
+public class SpeedTestDotNet extends Observable implements Observer {
+	
+	public Map<String, Integer> deltaDownloaded;
+	// public HashMap<String, integer> deltaUploaded;
+	// public Timer timer;
 
-   class Poll extends TimerTask{
-      
-      public void run(){
-         
-      }
+	@Override
+	public void update(Observable o, Object arg) {
+		if (o instanceof Peer && arg instanceof Integer)
+			incrementDownload((Peer)o, ((Integer)arg).intValue());
+	}
 
-   }
-
-
-   public SpeedTestDotNet(){
-      Timer =  
-   }
+	public SpeedTestDotNet() {
+		deltaDownloaded = new HashMap<>();
+	}
 
 
-   public synchronized Set<Map.Entry<String, int>> poll(){
-      
-   }
+	public synchronized List<Map.Entry<String, Integer>> poll() {
+		List<Map.Entry<String, Integer>> orderedPeers = new ArrayList<>(deltaDownloaded.entrySet());
+		Collections.sort(orderedPeers, new Comparator<Map.Entry<String, Integer>>() {
+			@Override
+			public int compare(Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2) {
+				return o2.getValue() - o1.getValue();
+			}
+		});
+		deltaDownloaded.clear();
+		return orderedPeers;
+	}
 
-   public synchronized int increment(String peerID, int quantity, HashMap<String, int> deltaMap){
-      return deltaMap.put(peerID, deltaMap.get(peerID) + quantity);
-   }
+	public synchronized void incrementDownload(Peer peer, int bytesDownloaded) {
+		if (deltaDownloaded.containsKey(peer.peer_id))
+			bytesDownloaded += deltaDownloaded.get(peer.peer_id);
+		deltaDownloaded.put(peer.peer_id, bytesDownloaded);
+	}
+
+	// public synchronized int increment(String peerID, int quantity, HashMap<String, int> deltaMap){
+	//    return deltaMap.put(peerID, deltaMap.get(peerID) + quantity);
+	// }
 
 
 
