@@ -14,7 +14,7 @@ import GivenTools.*;
  * to notify it when certain events have occurred, such as
  * a message has been received.
  */
-public class Peer {
+public class Peer extends Observable {
 	public final String ip;
 	public final String peer_id;
 	public final int port;
@@ -124,7 +124,7 @@ public class Peer {
 			output = new DataOutputStream(sock.getOutputStream());
 			input = new DataInputStream(sock.getInputStream());
 		} catch (Exception e) {
-			if (!(e instanceof ConnectException))
+			if (!(e instanceof ConnectException) && !(e instanceof SocketTimeoutException))
 				e.printStackTrace();
 			shutdown();
 			delegate.peerDidFailToConnect(this);
@@ -172,6 +172,20 @@ public class Peer {
 	 * @throws IOException if any errors occur, they will be thrown
 	 */
 	protected void writeToSocket(MessageData message) throws IOException, SocketException {
+		switch (message.type) {
+			case CHOKE:
+				setAmChoking(true);
+				break;
+			case UNCHOKE:
+				setAmChoking(false);
+				break;
+			case INTERESTED:
+				setAmInterested(true);
+				break;
+			case NOTINTERESTED:
+				setAmInterested(false);
+				break;
+		}
 		System.out.println("writing " + message.type + " to socket");
 		output.write(message.message);
 		output.flush();
@@ -195,6 +209,8 @@ public class Peer {
 		Boolean isReading = true;
 		while (isReading) {
 			try {
+				long startTime = 0;
+				long endTime = 0;
 				byte[] messageBuffer = new byte[4];
 				input.readFully(messageBuffer);
 				int messageLength = ByteBuffer.wrap(messageBuffer).getInt();
@@ -209,7 +225,9 @@ public class Peer {
 					// System.out.println("reading next " + messageLength + " bytes:");
 					byte[] newMsgBuf = new byte[4 + messageLength];
 					System.arraycopy(messageBuffer, 0, newMsgBuf, 0, 4);
+					startTime = System.currentTimeMillis();
 					input.readFully(newMsgBuf, 4, messageLength);
+					endTime = System.currentTimeMillis();
 					messageBuffer = newMsgBuf;
 				}
 
@@ -223,12 +241,12 @@ public class Peer {
 				System.out.println("message " + message.type.toString() + " came in");
 				switch (message.type) {
 					case CHOKE:
-						setIsChocking(true);
+						setIsChoking(true);
 						eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.UNCHOKED, this));
 						delegate.peerDidReceiveChoke(this);
 						break;
 					case UNCHOKE:
-						setIsChocking(false);
+						setIsChoking(false);
 						delegate.peerDidReceiveUnChoke(this);
 						break;
 					case INTERESTED:
@@ -251,6 +269,11 @@ public class Peer {
 						delegate.peerDidReceiveRequest(this, message.pieceIndex, message.beginIndex, message.blckLength);
 						break;
 					case PIECE:
+						double downloadSeconds = (endTime - startTime) / 1000.0;
+						double rate = (double)message.blckLength / downloadSeconds;
+						System.out.format("download time is %f, blckLength: %d, rate: %f\n", downloadSeconds, message.blckLength, rate);
+						hasChanged();
+						notifyObservers(message.blckLength);
 						delegate.peerDidReceivePiece(this, message.pieceIndex, message.beginIndex, message.block);
 						break;
 					case CANCEL:
@@ -258,9 +281,9 @@ public class Peer {
 						break;
 				}
 			} catch (Exception e) {
-				if (!getIsShuttingDown() ||
-					(e instanceof EOFException) ||
-					(e instanceof SocketException)) {
+				if (!getIsShuttingDown() &&
+					!(e instanceof EOFException) &&
+					!(e instanceof SocketException)) {
 					e.printStackTrace();
 				}
 				isReading = false;
@@ -321,7 +344,7 @@ public class Peer {
 				if (readThread != null)
 					readThread.peerDidHandshake(peerIsLegit);
 			} catch (Exception e) {
-				if (!(e instanceof SocketException) && !isShuttingDown)
+				if (!(e instanceof SocketException) && !(e instanceof EOFException) && !isShuttingDown)
 					e.printStackTrace();
 				shutdown();
 			}
@@ -361,19 +384,19 @@ public class Peer {
 	 * such as notifying delegate that this peer is no longer chocking
 	 */
 
-	public synchronized Boolean getIsChocking() {
+	public synchronized Boolean getIsChoking() {
 		return isChocking;
 	}
 
-	protected synchronized void setIsChocking(Boolean value) {
+	protected synchronized void setIsChoking(Boolean value) {
 		isChocking = value;
 	}
 
-	public synchronized Boolean getAmChocking() {
+	public synchronized Boolean getAmChoking() {
 		return amChocking;
 	}
 
-	public synchronized void setAmChocking(Boolean value) {
+	public synchronized void setAmChoking(Boolean value) {
 		amChocking = value;
 	}
 
@@ -403,6 +426,7 @@ public class Peer {
 		try {
 			eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.SHUTDOWN, this));
 			setIsShuttingDown(true);
+			deleteObservers();
 			disconnect();
 		} catch (Exception e) {
 			e.printStackTrace();

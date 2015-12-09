@@ -10,7 +10,9 @@ import javax.swing.*;
 public class RUBTClient {
 
 	public static final String peerId = generatePeerId();
-	private static int port;
+	public static final int MAX_PEERS = 10;
+   
+   private static int port;
 	/**
 	 * returns a randomly generated peer id to be used for
 	 * communication with peers/tracker

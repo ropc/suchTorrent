@@ -33,12 +33,14 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	boolean isRunning;
 	boolean didStart = false;
 	private BlockingDeque<Callable<Void>> runQueue;
-	protected List<Peer> connectedPeers;
-	protected List<Peer> attemptingToConnectPeers;
+	protected Map<String, Peer> connectedPeers;
+	protected Map<String, Peer> attemptingToConnectPeers;
 	protected Bitfield localBitfield;
 	private Queue<PieceIndexCount> piecesToDownload;
 	private Queue<Integer> requestedPieces;
 
+	protected SpeedTestDotNet odometer;
+	private Timer chokeTimer;
 	protected String filename;
 
 	public synchronized int getUploaded() {
@@ -52,7 +54,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 
 	public synchronized int getDownloaded() {
 		int newInt = downloaded;
-		return downloaded;
+		return newInt;
 	}
 
 	private synchronized void incrementDownloaded(int value) {
@@ -117,8 +119,8 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 		size = info.file_length;
 		tracker = new Tracker(escaped_info_hash, info.announce_url.toString(), size);
 		fileWriter = new Writer(saveFileName, info.piece_length);
-		connectedPeers = new ArrayList<>();
-		attemptingToConnectPeers = new ArrayList<>();
+		connectedPeers = new HashMap<>();
+		attemptingToConnectPeers = new HashMap<>();
 		piecesToDownload = new ArrayDeque<>(info.piece_hashes.length);
 		requestedPieces = new ArrayDeque<>(info.piece_hashes.length);
 		startTime = System.currentTimeMillis();
@@ -148,6 +150,8 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 
 		isRunning = true;
 		runQueue = new LinkedBlockingDeque<>();
+		odometer = new SpeedTestDotNet();
+		chokeTimer = new Timer();
 	}
 
    /**
@@ -229,12 +233,12 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	}
 
 	protected void disconnectPeers() {
-		for (Peer peer : connectedPeers) {
+		for (Peer peer : connectedPeers.values()) {
 			System.out.println("shutting down peer " + peer.ip);
 			peer.shutdown();
 		}
 		connectedPeers.clear();
-		for (Peer peer : attemptingToConnectPeers) {
+		for (Peer peer : attemptingToConnectPeers.values()) {
 			System.out.println("shutting down peer " + peer.ip);
 			peer.shutdown();
 		}
@@ -246,7 +250,8 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 		if (usefulPiecesFromPeer.size() > 0) {
 			boolean pieceWasRequested = false;
 			List<PieceIndexCount> failedPieces = new ArrayList<>();
-			while (!pieceWasRequested) {
+			// Will never stay here forever
+			for (int i = 0; !pieceWasRequested && i < 10; i++) {
 				Integer pieceToRequest = null;
 				PieceIndexCount pieceObj = piecesToDownload.poll();
 				
@@ -293,7 +298,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	 */
 	protected int getPeerCountForPiece(int index) {
 		int count = 0;
-		for (Peer peer : connectedPeers) {
+		for (Peer peer : connectedPeers.values()) {
 			if (peer.getBitfield().get(index) == true)
 				count++;
 		}
@@ -331,7 +336,9 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	public void shutdown() {
 		try {
 			runQueue.putFirst(new Callable<Void>() {
+				@Override
 				public Void call() {
+					chokeTimer.cancel();
 					disconnectPeers();
 					tracker.getTrackerResponse(getUploaded(), getDownloaded(), Tracker.MessageType.STOPPED);
 					isRunning = false;
@@ -355,11 +362,14 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 
 	public void createIncomingPeer(Handshake peer_hs, Socket sock){
 		Peer incPeer = Peer.peerFromHandshake(peer_hs, sock, this);
+		incPeer.addObserver(odometer);
 
 		if (incPeer != null && !incPeer.sock.isClosed() && incPeer.sock.isConnected()){
-			attemptingToConnectPeers.add(incPeer);
-			PeerRunnable.HS_StartAndReadRunnable runnable = new PeerRunnable.HS_StartAndReadRunnable(incPeer, peer_hs);
-			(new Thread(runnable)).start();     
+			if (!attemptingToConnectPeers.containsKey(incPeer.peer_id)) {
+				attemptingToConnectPeers.put(incPeer.peer_id, incPeer);
+				PeerRunnable.HS_StartAndReadRunnable runnable = new PeerRunnable.HS_StartAndReadRunnable(incPeer, peer_hs);
+				(new Thread(runnable)).start();     
+			}
 		} else {
 			System.err.println("Something fucked up, socket is closed on incPeer");
 		}
@@ -383,6 +393,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	public void peerDidReceiveUnChoke(final Peer peer) {
 		try {
 			runQueue.putLast(new Callable<Void>() {
+				@Override
 				public Void call() {
 					if (didStart == false) {
 						if (getDownloaded() != size)
@@ -403,6 +414,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	public void peerDidReceiveInterested(final Peer peer) {
 		try {
 			runQueue.putLast(new Callable<Void>() {
+				@Override
 				public Void call() {
 					peer.send(new MessageData(Message.UNCHOKE));
 					return null;
@@ -419,6 +431,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 		// update rarest piece
 		try {
 			runQueue.putLast(new Callable<Void>() {
+				@Override
 				public Void call() {
 					System.out.println("updating rarity for " + pieceIndex);
 					updateRarestPiece(pieceIndex);
@@ -434,6 +447,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 		// update rarest piece too
 		try {
 			runQueue.putLast(new Callable<Void>() {
+				@Override
 				public Void call() {
 					for (int i = 0; i < bitfield.numBits; i++) {
 						if (bitfield.get(i) == true) {
@@ -467,6 +481,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	public void peerDidReceivePiece(final Peer peer, final int index, final int begin, final byte[] block) {
 		try {
 			runQueue.putLast(new Callable<Void>() {
+				@Override
 				public Void call() {
 					if (pieceIsCorrect(index, block)) {
 						if (localBitfield.get(index) == false) {
@@ -513,10 +528,11 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	public void peerDidHandshake(final Peer peer, final Boolean peerIsLegit) {
 		try {
 			runQueue.putLast(new Callable<Void>() {
+				@Override
 				public Void call() {
 					if (peerIsLegit) {
-						connectedPeers.add(peer);
-						attemptingToConnectPeers.remove(peer);
+						connectedPeers.put(peer.peer_id, peer);
+						attemptingToConnectPeers.remove(peer.peer_id);
 					} else {
 						peer.shutdown();
 					}
@@ -531,6 +547,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	public void peerDidInitiateConnection(final Peer peer) {
 		try {
 			runQueue.putLast(new Callable<Void>() {
+				@Override
 				public Void call() {
 					for (int i = 0; i < localBitfield.numBits; i++) {
 						if (localBitfield.get(i) == true) {
@@ -553,6 +570,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	public void peerDidFailToConnect(final Peer peer) {
 		try {
 			runQueue.putLast(new Callable<Void>() {
+				@Override
 				public Void call() {
 					System.err.println("Could not connect to peer " + peer.peer_id + " at ip: " + peer.ip);
 					peer.shutdown();
@@ -568,6 +586,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	public void peerDidDisconnect(final Peer peer) {
 		try {
 			runQueue.putLast(new Callable<Void>() {
+				@Override
 				public Void call() {
 					attemptingToConnectPeers.remove(peer);
 					connectedPeers.remove(peer);
@@ -602,6 +621,51 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 		return localBitfield.clone();
 	}
 
+	protected class OptimisticUnchokeTask extends TimerTask {
+		@Override
+		public void run() {
+			try {
+				runQueue.putLast(new Callable<Void>() {
+					@Override
+					public Void call() {
+						System.out.println("OPTIMISTIC UNCHOKING task called");
+						boolean slowPeerChoked = false;
+						List<Map.Entry<String, Integer>> increasingDownloadPeers = odometer.poll();
+						for (Map.Entry<String, Integer> peerEntry : increasingDownloadPeers) {
+							if (connectedPeers.containsKey(peerEntry.getKey())) {
+								Peer slowPeer = connectedPeers.get(peerEntry.getKey());
+								if (slowPeer.getAmChoking() == false) {
+									slowPeer.send(new MessageData(Message.CHOKE));
+									slowPeerChoked = true;
+									System.out.println("Choked peer " + slowPeer.ip);
+									break;
+								}
+							}
+						}
+						if (slowPeerChoked) {
+							List<Peer> unchokedAndInterestedPeers = new ArrayList<>();
+							for (Peer peer : connectedPeers.values()) {
+								if (peer.getAmChoking() && peer.getIsInterested()) {
+									unchokedAndInterestedPeers.add(peer);
+								}
+							}
+							if (unchokedAndInterestedPeers.size() > 0) {
+								int randomIndex = (new Random()).nextInt(unchokedAndInterestedPeers.size());
+								Peer randomPeer = unchokedAndInterestedPeers.get(randomIndex);
+								randomPeer.send(new MessageData(Message.UNCHOKE));
+								System.out.println("Unchoked peer " + randomPeer.ip);
+							}
+						}
+						return null;
+					}
+				});
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	protected OptimisticUnchokeTask optimisticUnchokeTask = new OptimisticUnchokeTask();
 
 	/**
 	 * Start torrent handler. Which will communicate with the tracker
@@ -632,7 +696,8 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 						// }
 						// establish a connection with this peer
 						Peer client = Peer.peerFromMap(map_peer, this);
-						attemptingToConnectPeers.add(client);
+						client.addObserver(odometer);
+						attemptingToConnectPeers.put(client.peer_id, client);
 						client.startThreads();
 					}
 				}
@@ -644,7 +709,9 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 		} else {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
-		
+
+		chokeTimer.scheduleAtFixedRate(optimisticUnchokeTask, 30000, 30000);
+
 		// Now start consuming the queue, calling each object/
 		// block of code put in the queue
 		Callable<Void> block = null;
