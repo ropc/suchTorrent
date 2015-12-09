@@ -22,7 +22,7 @@ public class SessionHandler{
         pieceSize=pSize;
             Path file = Paths.get("");//Get the current directory's position.
         Path f2 = Paths.get("");
-        f2 = FileSystems.getDefault().getPath(f2.toAbsolutePath().toString(),fileName);
+            f2 = FileSystems.getDefault().getPath(f2.toAbsolutePath().toString(),fileName);
             file = FileSystems.getDefault().getPath(file.toAbsolutePath().toString(),fileName+".info");//Get the absolute path of the present directory, and append the desired filename
         try{   
             Info = new File(file.toAbsolutePath().toString());
@@ -75,9 +75,9 @@ public class SessionHandler{
         ret = Info.delete(); //The only way to replace data is to delete then rewrite in Java, so here we go
         if(ret){
             Info.createNewFile();//Remake the file in its original image
+            infoFileWriter = FileChannel.open(FileSystems.getDefault().getPath(Info.getAbsolutePath(),""),READ,WRITE);//Create a file writer for this file
         }
         try{
-            infoFileWriter = FileChannel.open(FileSystems.getDefault().getPath(Info.getAbsolutePath(),""),READ,WRITE);//Create a file writer for this file
             ByteBuffer s = ByteBuffer.wrap(f);
             infoFileWriter.write(s,0);//Write the current session out to the session file
         }catch(Exception e){
@@ -136,7 +136,7 @@ public class SessionHandler{
                
             }
         }
-       
+       f.close();
         return result;
     }
    
@@ -170,6 +170,7 @@ public class SessionHandler{
                
             }
         }
+        f.close();
         return result;
     }
    
@@ -186,6 +187,7 @@ public class SessionHandler{
        byte[] ret = new byte[sizeOfRequest];
        int position = (pieceSize*pieceIndex)+offsetWithinPiece;
        f.read(ret,position,sizeOfRequest);
+       f.close();
        return ret;
    }
    

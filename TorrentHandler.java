@@ -15,7 +15,7 @@ import GivenTools.*;
  * schedule communication to the tracker, and maintain the
  * torrent data for a given torrent.
  */
-public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
+public class TorrentHandler extends Observable implements TorrentDelegate, PeerDelegate, Runnable {
 	protected final TorrentInfo info;
 	public Tracker tracker;
 	public final String escaped_info_hash;
@@ -41,6 +41,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 
 	protected SpeedTestDotNet odometer;
 	private Timer chokeTimer;
+	protected String filename;
 
 	public synchronized int getUploaded() {
 		int newInt = uploaded;
@@ -110,6 +111,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String saveFileName) throws IOException {
 		this.info = info;
 		this.escaped_info_hash = escaped_info_hash;
+		filename = saveFileName;
 		local_peer_id = RUBTClient.peerId;
 		listenPort = RUBTClient.getListenPort();
 		uploaded = 0;
@@ -373,6 +375,14 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		}
 	}
 
+	public String getFilename() {
+		return filename;
+	}
+
+	public synchronized double getDownloadPercentage() {
+		return 100.0 * (double)getDownloaded() / info.file_length;
+	}
+
 
 	/**
 	 * "PeerDelegate" interface methods
@@ -484,8 +494,11 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 								e.printStackTrace();
 							}
 							incrementDownloaded(getPieceSize(index));
+							double percentDownloaded = 100.0 * (double)getDownloaded() / info.file_length;
 							System.out.format("downloaded %d out of %d (%.2f %%) (processed piece %d of size %d)\n",
-								getDownloaded(), info.file_length, 100.0 * (double)getDownloaded() / info.file_length, index, getPieceSize(index));
+								getDownloaded(), info.file_length, percentDownloaded, index, getPieceSize(index));
+							setChanged();
+							notifyObservers(percentDownloaded);
 						}
 					} else {
 						piecesToDownload.add(new PieceIndexCount(index, getPeerCountForPiece(index)));
