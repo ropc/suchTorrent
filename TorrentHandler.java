@@ -53,7 +53,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 
 	public synchronized int getDownloaded() {
 		int newInt = downloaded;
-		return downloaded;
+		return newInt;
 	}
 
 	private synchronized void incrementDownloaded(int value) {
@@ -248,7 +248,8 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		if (usefulPiecesFromPeer.size() > 0) {
 			boolean pieceWasRequested = false;
 			List<PieceIndexCount> failedPieces = new ArrayList<>();
-			while (!pieceWasRequested) {
+			// Will never stay here forever
+			for (int i = 0; !pieceWasRequested && i < 10; i++) {
 				Integer pieceToRequest = null;
 				PieceIndexCount pieceObj = piecesToDownload.poll();
 				
@@ -607,53 +608,52 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		return localBitfield.clone();
 	}
 
-	public TimerTask getOptimisticUnchokeTask() {
-		return new TimerTask() {
-			@Override
-			public void run() {
-				System.out.println("OPTIMISTIC UNCHOKING");
-				try {
-					runQueue.putLast(new Callable<Void>() {
-						@Override
-						public Void call() {
-							System.out.println("OPTIMISTIC UNCHOKING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-							boolean slowPeerChoked = false;
-							List<Map.Entry<String, Integer>> increasingDownloadPeers = odometer.poll();
-							for (Map.Entry<String, Integer> peerEntry : increasingDownloadPeers) {
-								if (connectedPeers.containsKey(peerEntry.getKey())) {
-									Peer slowPeer = connectedPeers.get(peerEntry.getKey());
-									if (slowPeer.getAmChoking() == false) {
-										slowPeer.send(new MessageData(Message.CHOKE));
-										slowPeerChoked = true;
-										System.out.println("Choked peer " + slowPeer.ip);
-										break;
-									}
+	protected class OptimisticUnchokeTask extends TimerTask {
+		@Override
+		public void run() {
+			try {
+				System.out.println("OPTIMISTIC UNCHOKING task running");
+				runQueue.putLast(new Callable<Void>() {
+					@Override
+					public Void call() {
+						System.out.println("OPTIMISTIC UNCHOKING queue task called");
+						boolean slowPeerChoked = false;
+						List<Map.Entry<String, Integer>> increasingDownloadPeers = odometer.poll();
+						for (Map.Entry<String, Integer> peerEntry : increasingDownloadPeers) {
+							if (connectedPeers.containsKey(peerEntry.getKey())) {
+								Peer slowPeer = connectedPeers.get(peerEntry.getKey());
+								if (slowPeer.getAmChoking() == false) {
+									slowPeer.send(new MessageData(Message.CHOKE));
+									slowPeerChoked = true;
+									System.out.println("Choked peer " + slowPeer.ip);
+									break;
 								}
 							}
-							if (slowPeerChoked) {
-								List<Peer> unchokedAndInterestedPeers = new ArrayList<>();
-								for (Peer peer : connectedPeers.values()) {
-									if (peer.getAmChoking() && peer.getIsInterested()) {
-										unchokedAndInterestedPeers.add(peer);
-									}
-								}
-								if (unchokedAndInterestedPeers.size() > 0) {
-									int randomIndex = (new Random()).nextInt(unchokedAndInterestedPeers.size());
-									Peer randomPeer = unchokedAndInterestedPeers.get(randomIndex);
-									randomPeer.send(new MessageData(Message.UNCHOKE));
-									System.out.println("Unchoked peer " + randomPeer.ip);
-								}
-							}
-							return null;
 						}
-					});
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
+						if (slowPeerChoked) {
+							List<Peer> unchokedAndInterestedPeers = new ArrayList<>();
+							for (Peer peer : connectedPeers.values()) {
+								if (peer.getAmChoking() && peer.getIsInterested()) {
+									unchokedAndInterestedPeers.add(peer);
+								}
+							}
+							if (unchokedAndInterestedPeers.size() > 0) {
+								int randomIndex = (new Random()).nextInt(unchokedAndInterestedPeers.size());
+								Peer randomPeer = unchokedAndInterestedPeers.get(randomIndex);
+								randomPeer.send(new MessageData(Message.UNCHOKE));
+								System.out.println("Unchoked peer " + randomPeer.ip);
+							}
+						}
+						return null;
+					}
+				});
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
-		};
+		}
 	}
 
+	protected OptimisticUnchokeTask optimisticUnchokeTask = new OptimisticUnchokeTask();
 
 	/**
 	 * Start torrent handler. Which will communicate with the tracker
@@ -698,7 +698,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
 
-		chokeTimer.scheduleAtFixedRate(getOptimisticUnchokeTask(), 3000, 3000);
+		chokeTimer.scheduleAtFixedRate(optimisticUnchokeTask, 3000, 3000);
 
 		// Now start consuming the queue, calling each object/
 		// block of code put in the queue

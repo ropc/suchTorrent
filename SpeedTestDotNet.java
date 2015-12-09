@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.SortedSet;
 import java.util.Comparator;
 
-public class SpeedTestDotNet extends Observable implements Observer {
+public class SpeedTestDotNet implements Observer {
 	
 	public Map<String, Integer> deltaDownloaded;
 	// public HashMap<String, integer> deltaUploaded;

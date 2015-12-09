@@ -124,7 +124,7 @@ public class Peer extends Observable {
 			output = new DataOutputStream(sock.getOutputStream());
 			input = new DataInputStream(sock.getInputStream());
 		} catch (Exception e) {
-			if (!(e instanceof ConnectException))
+			if (!(e instanceof ConnectException) && !(e instanceof SocketTimeoutException))
 				e.printStackTrace();
 			shutdown();
 			delegate.peerDidFailToConnect(this);
@@ -281,9 +281,9 @@ public class Peer extends Observable {
 						break;
 				}
 			} catch (Exception e) {
-				if (!getIsShuttingDown() ||
-					(e instanceof EOFException) ||
-					(e instanceof SocketException)) {
+				if (!getIsShuttingDown() &&
+					!(e instanceof EOFException) &&
+					!(e instanceof SocketException)) {
 					e.printStackTrace();
 				}
 				isReading = false;
@@ -344,7 +344,7 @@ public class Peer extends Observable {
 				if (readThread != null)
 					readThread.peerDidHandshake(peerIsLegit);
 			} catch (Exception e) {
-				if (!(e instanceof SocketException) && !isShuttingDown)
+				if (!(e instanceof SocketException) && !(e instanceof EOFException) && !isShuttingDown)
 					e.printStackTrace();
 				shutdown();
 			}
@@ -426,6 +426,7 @@ public class Peer extends Observable {
 		try {
 			eventQueue.put(new PeerEvent<EventPayload>(PeerEvent.Type.SHUTDOWN, this));
 			setIsShuttingDown(true);
+			deleteObservers();
 			disconnect();
 		} catch (Exception e) {
 			e.printStackTrace();
