@@ -23,7 +23,25 @@ public interface PeerDelegate {
 	 * @return         true if peer should continue listening,
 	 *                      false if peer should stop listening.
 	 */
-	public void peerDidReceiveMessage(Peer peer, MessageData message);
+	// public void peerDidReceiveMessage(Peer peer, MessageData message);
+
+	public void peerDidReceiveChoke(final Peer peer);
+
+	public void peerDidReceiveUnChoke(final Peer peer);
+
+	public void peerDidReceiveInterested(final Peer peer);
+
+	public void peerDidReceiveNotInterested(final Peer peer);
+
+	public void peerDidReceiveHave(final Peer peer, final int pieceIndex);
+
+	public void peerDidReceiveBitfield(final Peer peer, final Bitfield bitfield);
+
+	public void peerDidReceiveRequest(final Peer peer, final int index, final int begin, final int length);
+
+	public void peerDidReceivePiece(final Peer peer, final int index, final int begin, final byte[] block);
+
+	public void peerDidReceiveCancel(final Peer peer, final int index, final int begin, final int length);
 
 	/**
 	 * Called by a Peer if a socket could not be created to the
@@ -35,4 +53,8 @@ public interface PeerDelegate {
 	public String getLocalPeerId();
 
 	public TorrentInfo getTorrentInfo();
+
+	public void peerDidInitiateConnection(Peer peer);
+
+	public void peerDidDisconnect(final Peer peer);
 }

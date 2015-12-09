@@ -11,10 +11,7 @@ public class Tracker{
 	private int interval; //The time interval between get requests expected by the tracker
 	private int size;//Total size of the file being downloaded
 	private String URL; //The url of the tracker
-	private int uploaded; // The amount that has been uploaded so far [since start message sent to tracker]
-	private int downloaded;// The amount that has been downloaded so far [since start message sent to tracker]
 	public enum MessageType{UNDEFINED,STARTED,STOPPED,COMPLETED} //The type of message that can be sent to the tracker
-	public MessageType event; //The type of message that is to be sent to the tracker
 
 	public final static ByteBuffer KEY_COMPLETE = ByteBuffer.wrap(new byte[] { 'c', 'o', 'm', 'p', 'l', 'e', 't', 'e'});
 	public final static ByteBuffer KEY_DOWNLOADED = ByteBuffer.wrap(new byte[] { 'd', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 'e', 'd' });
@@ -38,7 +35,6 @@ public class Tracker{
 		escaped_info_hash = einfo;
 		URL=aURL;
 		size=filesize;
-		event=MessageType.STARTED;
 	}
 	
 	/**
@@ -47,7 +43,7 @@ public class Tracker{
 	*@param port = the port you want to try and connect on.
 	*return: The HttpUrlConnection object that can be used to connect to the tracker
 	*/
-	private HttpURLConnection TalkToTracker() {
+	private HttpURLConnection TalkToTracker(MessageType event, int uploaded, int downloaded) {
 		StringBuilder urlString = new StringBuilder(URL);
 		urlString.append("?info_hash=" + escaped_info_hash);
 		try {
@@ -91,14 +87,11 @@ public class Tracker{
 	*return: The map returned by the Tracker [decoded]
 	*/
 	@SuppressWarnings("unchecked")
-	public Map<ByteBuffer, Object> getTrackerResponse(int Cuploaded, int Cdownloaded, MessageType M){//Send a message to the tracker and wait on a response. Return the decoded response.
-		event=M;
-		uploaded = Cuploaded;		
-		downloaded = Cdownloaded;		//Update the uploaded and downloaded amounts
+	public Map<ByteBuffer, Object> getTrackerResponse(int uploaded, int downloaded, MessageType event){//Send a message to the tracker and wait on a response. Return the decoded response.
 		Map<ByteBuffer, Object> retval;	//The Map that will be returned at the end of the method.
 		
 	
-		HttpURLConnection connection = TalkToTracker();//begin by trying to connect at the lowest port number.
+		HttpURLConnection connection = TalkToTracker(event, uploaded, downloaded);//begin by trying to connect at the lowest port number.
 		try{
 			connection.connect();	//Try and connect to this version of the connection
 		}
@@ -127,11 +120,6 @@ public class Tracker{
 			System.err.println("Error happened while reading data sent from the server!");
 			return null;
 		}
-	}
-
-	public void sendStoppedMessage(){
-		event = MessageType.STOPPED;
-		TalkToTracker();
 	}
 
 }

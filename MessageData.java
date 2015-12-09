@@ -135,6 +135,7 @@ class MessageData implements EventPayload {
 			case PIECE:
 				block = new byte[msgLength - 9];
 				System.arraycopy(array, 13, block, 0, msgLength - 9); 
+				blckLength = block.length;
 				pieceIndex = ByteBuffer.wrap(array, 5, 4).getInt();
 				beginIndex = ByteBuffer.wrap(array, 9, 4).getInt();
 				break;
