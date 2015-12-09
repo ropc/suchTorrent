@@ -39,6 +39,8 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	private Queue<PieceIndexCount> piecesToDownload;
 	private Queue<Integer> requestedPieces;
 
+	protected String filename;
+
 	public synchronized int getUploaded() {
 		int newInt = uploaded;
 		return newInt;
@@ -107,6 +109,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	protected TorrentHandler(TorrentInfo info, String escaped_info_hash, String saveFileName) throws IOException {
 		this.info = info;
 		this.escaped_info_hash = escaped_info_hash;
+		filename = saveFileName;
 		local_peer_id = RUBTClient.peerId;
 		listenPort = RUBTClient.getListenPort();
 		uploaded = 0;
@@ -360,6 +363,14 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 		} else {
 			System.err.println("Something fucked up, socket is closed on incPeer");
 		}
+	}
+
+	public String getFilename() {
+		return filename;
+	}
+
+	public synchronized double getDownloadPercentage() {
+		return 100.0 * (double)getDownloaded() / info.file_length;
 	}
 
 

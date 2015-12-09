@@ -6,6 +6,7 @@ import java.util.*;
 import java.nio.*;
 import GivenTools.*;
 import java.util.concurrent.*;
+import java.awt.event.*;
 import javax.swing.*;
 
 public class RUBTClient {
@@ -32,7 +33,6 @@ public class RUBTClient {
 	}
 
 	final static JFrame window = new JFrame();
-	final static JLabel percentDownload = new JLabel("0%");
 
 	/**
 	 * main method for BitTorrent client.
@@ -42,7 +42,7 @@ public class RUBTClient {
 	 *             these should be torrentFileName saveFileName
 	 */
 	public static void main(String[] args) {
-		Scanner sc = new Scanner(System.in);
+		final Scanner sc = new Scanner(System.in);
 		Boolean isReceivingInput = true;
 
 		System.out.println("Peer ID is: " + peerId);
@@ -75,13 +75,21 @@ public class RUBTClient {
 			server.shutdown();
 		}
 
+
 		
 		if (isReceivingInput == true) {
 			window.setSize(400, 500);
 			window.setLayout(null);
 			window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+
+			final JLabel fileLabel = new JLabel(myTorrent.getFilename());
+			fileLabel.setBounds(70, 70, 300, 40);
+			window.add(fileLabel);
+
+			final JLabel percentDownload = new JLabel(String.format("%.2f %% downloaded", myTorrent.getDownloadPercentage()));
 			percentDownload.setBounds(130, 100, 300, 40);
 			window.add(percentDownload);
+
 			myTorrent.addObserver(new Observer() {
 				@Override
 				public void update(Observable o, Object arg) {
@@ -89,6 +97,7 @@ public class RUBTClient {
 					percentDownload.setText(text);
 				}
 			});
+
 			window.setVisible(true);
 		}
 
