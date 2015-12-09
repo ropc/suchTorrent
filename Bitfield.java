@@ -1,7 +1,7 @@
 /**
  * Written by John Jordan, Rodrigo Pacheco Curro, and Robert Sehringer
  */
-import java.util.Arrays;
+import java.util.*;
 
 public class Bitfield implements Cloneable {
 	/**
@@ -145,13 +145,22 @@ public class Bitfield implements Cloneable {
 		}
 	}
 
+	public Set<Integer> getSetBitIndexes() {
+		Set<Integer> intSet = new HashSet<>();
+		for (int i = 0; i < numBits; i++) {
+			if (get(i) == true)
+				intSet.add(i);
+		}
+		return intSet;
+	}
+
 	/**
 	 * Will perform a bitwise AND with this Bitfield
 	 * and the given bitfield
 	 * @param  otherBitfield the bitfield to AND with
 	 * @return               the AND result as a Bitfield
 	 */
-	public Bitfield And(Bitfield otherBitfield) {
+	public Bitfield and(Bitfield otherBitfield) {
 		return BitfieldAND(this, otherBitfield);
 	}
 
@@ -161,7 +170,7 @@ public class Bitfield implements Cloneable {
 	 * @param  otherBitfield the bitfield to OR with
 	 * @return               the OR result as a Bitfield
 	 */
-	public Bitfield Or(Bitfield otherBitfield) {
+	public Bitfield or(Bitfield otherBitfield) {
 		return BitfieldOR(this, otherBitfield);
 	}
 
@@ -171,7 +180,7 @@ public class Bitfield implements Cloneable {
 	 * @param  otherBitfield the bitfield to XOR with
 	 * @return               the XOR result as a Bitfield
 	 */
-	public Bitfield Xor(Bitfield otherBitfield) {
+	public Bitfield xor(Bitfield otherBitfield) {
 		return BitfieldXOR(this, otherBitfield);
 	}
 
@@ -179,7 +188,7 @@ public class Bitfield implements Cloneable {
 	 * Will perform a bitwise NOT with this Bitfield
 	 * @return the NOT result as a Bitfield
 	 */
-	public Bitfield Not() {
+	public Bitfield not() {
 		return BitfieldNOT(this);
 	}
 
