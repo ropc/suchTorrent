@@ -239,28 +239,42 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 	}
 
 	public synchronized void requestNextPiece(final Peer peer) {
-		Integer pieceToRequest = null;
-		PieceIndexCount pieceObj = piecesToDownload.poll();
+		Set<Integer> usefulPiecesFromPeer = localBitfield.not().and(peer.getBitfield()).getSetBitIndexes();
+		if (usefulPiecesFromPeer.size() > 0) {
+			boolean pieceWasRequested = false;
+			List<PieceIndexCount> failedPieces = new ArrayList<>();
+			while (!pieceWasRequested) {
+				Integer pieceToRequest = null;
+				PieceIndexCount pieceObj = piecesToDownload.poll();
+				
+				if (pieceObj == null)
+					pieceToRequest = requestedPieces.poll();
+				else
+					pieceToRequest = pieceObj.index;
 
-		if (pieceObj == null)
-			pieceToRequest = requestedPieces.poll();
-		else
-			pieceToRequest = pieceObj.index;
-
-		if (pieceToRequest != null) {
-			int pieceIndex = pieceToRequest.intValue();
-			int pieceSize = getPieceSize(pieceIndex);
-			if (peer.getBitfield().get(pieceIndex) == true) {
-				System.out.println("sending REQUEST " + pieceIndex + " to " + peer.ip);
-				peer.send(new MessageData(Message.REQUEST, pieceIndex, 0, pieceSize));
-				requestedPieces.add(pieceIndex);
-			} else {
-				// At this point can either recursively call back on this,
-				// which may or may not cause an infinite loop if the peer
-				// has no pieces. Or can have some way of finding a Peer
-				// that does have the piece and request it to that Peer.
-				// Or can have some other way of finding a piece to request
+				if (pieceObj != null && pieceToRequest != null) {
+					int pieceIndex = pieceToRequest.intValue();
+					int pieceSize = getPieceSize(pieceIndex);
+					if (peer.getBitfield().get(pieceIndex) == true) {
+						System.out.println("sending REQUEST " + pieceIndex + " to " + peer.ip);
+						peer.send(new MessageData(Message.REQUEST, pieceIndex, 0, pieceSize));
+						requestedPieces.add(pieceIndex);
+						pieceWasRequested = true;
+					} else if (pieceObj != null) {
+						// At this point can either recursively call back on this,
+						// which may or may not cause an infinite loop if the peer
+						// has no pieces. Or can have some way of finding a Peer
+						// that does have the piece and request it to that Peer.
+						// Or can have some other way of finding a piece to request
+						failedPieces.add(pieceObj);
+					}
+				}
 			}
+			for (PieceIndexCount triedPieceObj : failedPieces)
+				failedPieces.add(triedPieceObj);
+
+		} else {
+			peer.send(new MessageData(Message.NOTINTERESTED));
 		}
 	}
 
@@ -540,6 +554,20 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 		}
 	}
 
+	public void peerDidDisconnect(final Peer peer) {
+		try {
+			runQueue.putLast(new Callable<Void>() {
+				public Void call() {
+					attemptingToConnectPeers.remove(peer);
+					connectedPeers.remove(peer);
+					return null;
+				}
+			});
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
 	/**
 	 * getters for useful info
 	 * the first two are also for the PeerDelegate interface
@@ -578,7 +606,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 			event = Tracker.MessageType.UNDEFINED;
 		Map<ByteBuffer, Object> decodedData = tracker.getTrackerResponse(uploaded, downloaded, event);
 		ToolKit.print(decodedData);
-		if (decodedData != null) {
+		if (decodedData != null && !finished) {
 			Object value = decodedData.get(Tracker.KEY_PEERS);
 			ArrayList<Map<ByteBuffer, Object>> peers = (ArrayList<Map<ByteBuffer, Object>>)value;
 			// ToolKit.print(peers);
@@ -586,20 +614,22 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 				for (Map<ByteBuffer, Object> map_peer : peers) {
 					ByteBuffer ip = (ByteBuffer)map_peer.get(Tracker.KEY_IP);
 					if (ip != null) {
-						String new_peer_ip = new String(ip.array());
-						if (new_peer_ip.compareTo("128.6.171.130") == 0 ||
-							new_peer_ip.compareTo("128.6.171.131") == 0)
-						{
-							// establish a connection with this peer
-							Peer client = Peer.peerFromMap(map_peer, this);
-							attemptingToConnectPeers.add(client);
-							client.startThreads();
-						}
+						// String new_peer_ip = new String(ip.array());
+						// if (new_peer_ip.compareTo("128.6.171.130") == 0 ||
+						// 	new_peer_ip.compareTo("128.6.171.131") == 0)
+						// {
+						// }
+						// establish a connection with this peer
+						Peer client = Peer.peerFromMap(map_peer, this);
+						attemptingToConnectPeers.add(client);
+						client.startThreads();
 					}
 				}
 			} else {
 				System.err.println("Could not find key PEERS in decoded tracker response");
 			}
+		} else if (finished) {
+			System.out.println("Seeding.");
 		} else {
 			System.err.println("Tracker response came back empty, please try again.");
 		}
@@ -614,5 +644,7 @@ public class TorrentHandler extends Observable implements TorrentDelegate, PeerD
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
+		System.out.println("TorrentHandler closing");
 	}
 }

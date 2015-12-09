@@ -55,4 +55,6 @@ public interface PeerDelegate {
 	public TorrentInfo getTorrentInfo();
 
 	public void peerDidInitiateConnection(Peer peer);
+
+	public void peerDidDisconnect(final Peer peer);
 }
