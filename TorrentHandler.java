@@ -537,6 +537,20 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		}
 	}
 
+	public void peerDidDisconnect(final Peer peer) {
+		try {
+			runQueue.putLast(new Callable<Void>() {
+				public Void call() {
+					attemptingToConnectPeers.remove(peer);
+					connectedPeers.remove(peer);
+					return null;
+				}
+			});
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
 	/**
 	 * getters for useful info
 	 * the first two are also for the PeerDelegate interface
@@ -613,5 +627,7 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
+		System.out.println("TorrentHandler closing");
 	}
 }

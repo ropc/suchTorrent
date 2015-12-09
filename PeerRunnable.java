@@ -8,10 +8,12 @@ public abstract class PeerRunnable implements Runnable {
 	public static class StartAndReadRunnable extends PeerRunnable {
 		public StartAndReadRunnable(Peer peerToManage) {
 			peer = peerToManage;
+			peer.readThread = this;
 		}
 
 		public void run() {
 			peer.start();
+			System.out.format("startReader thread %s closing\n", peer.ip);
 		}
 
 		public void peerDidHandshake(Boolean peerIsLegit) {
@@ -29,13 +31,13 @@ public abstract class PeerRunnable implements Runnable {
 
 		public HS_StartAndReadRunnable(Peer peerToManage, Handshake peer_hs) {
 			super(peerToManage);
-			peer.readThread = this;
 			hs = peer_hs;
 		}
 
 		@Override
 		public void run(){
 			peer.start(hs);
+			System.out.format("HSReader thread %s closing\n", peer.ip);
 		}
 	}
 
@@ -75,13 +77,13 @@ public abstract class PeerRunnable implements Runnable {
 						}
 					}
 				}
-			} catch (SocketException e) {
-				running = false;
-				peer.disconnect();
 			} catch (Exception e) {
-				e.printStackTrace();
+				if (!(e instanceof SocketException))
+					e.printStackTrace();
 			}
-			System.out.println("write thread closing");
+			peer.disconnect();
+
+			System.out.println("write thread for " + peer.ip + " closing");
 		}
 	}
 }
