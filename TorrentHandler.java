@@ -239,28 +239,42 @@ public class TorrentHandler implements TorrentDelegate, PeerDelegate, Runnable {
 	}
 
 	public synchronized void requestNextPiece(final Peer peer) {
-		Integer pieceToRequest = null;
-		PieceIndexCount pieceObj = piecesToDownload.poll();
+		Set<Integer> usefulPiecesFromPeer = localBitfield.not().and(peer.getBitfield()).getSetBitIndexes();
+		if (usefulPiecesFromPeer.size() > 0) {
+			boolean pieceWasRequested = false;
+			List<PieceIndexCount> failedPieces = new ArrayList<>();
+			while (!pieceWasRequested) {
+				Integer pieceToRequest = null;
+				PieceIndexCount pieceObj = piecesToDownload.poll();
+				
+				if (pieceObj == null)
+					pieceToRequest = requestedPieces.poll();
+				else
+					pieceToRequest = pieceObj.index;
 
-		if (pieceObj == null)
-			pieceToRequest = requestedPieces.poll();
-		else
-			pieceToRequest = pieceObj.index;
-
-		if (pieceToRequest != null) {
-			int pieceIndex = pieceToRequest.intValue();
-			int pieceSize = getPieceSize(pieceIndex);
-			if (peer.getBitfield().get(pieceIndex) == true) {
-				System.out.println("sending REQUEST " + pieceIndex + " to " + peer.ip);
-				peer.send(new MessageData(Message.REQUEST, pieceIndex, 0, pieceSize));
-				requestedPieces.add(pieceIndex);
-			} else {
-				// At this point can either recursively call back on this,
-				// which may or may not cause an infinite loop if the peer
-				// has no pieces. Or can have some way of finding a Peer
-				// that does have the piece and request it to that Peer.
-				// Or can have some other way of finding a piece to request
+				if (pieceObj != null && pieceToRequest != null) {
+					int pieceIndex = pieceToRequest.intValue();
+					int pieceSize = getPieceSize(pieceIndex);
+					if (peer.getBitfield().get(pieceIndex) == true) {
+						System.out.println("sending REQUEST " + pieceIndex + " to " + peer.ip);
+						peer.send(new MessageData(Message.REQUEST, pieceIndex, 0, pieceSize));
+						requestedPieces.add(pieceIndex);
+						pieceWasRequested = true;
+					} else if (pieceObj != null) {
+						// At this point can either recursively call back on this,
+						// which may or may not cause an infinite loop if the peer
+						// has no pieces. Or can have some way of finding a Peer
+						// that does have the piece and request it to that Peer.
+						// Or can have some other way of finding a piece to request
+						failedPieces.add(pieceObj);
+					}
+				}
 			}
+			for (PieceIndexCount triedPieceObj : failedPieces)
+				failedPieces.add(triedPieceObj);
+
+		} else {
+			peer.send(new MessageData(Message.NOTINTERESTED));
 		}
 	}
 
